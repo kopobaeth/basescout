@@ -1,5 +1,6 @@
 import React, { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import {
   Activity,
   AlertTriangle,
@@ -1434,5 +1435,6 @@ window.__basescoutRoot = root;
 root.render(
   <React.StrictMode>
     <App />
+    <Analytics />
   </React.StrictMode>
 );
