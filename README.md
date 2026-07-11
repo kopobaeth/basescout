@@ -1,10 +1,10 @@
 # BaseScout
 
-BaseScout is a frontend-only Base token risk scanner. Paste a Base token contract address, or use a built-in example, and it returns a compact risk score with human-readable findings.
+BaseScout is a Base token risk scanner with a Vercel serverless scan API. Paste a Base token contract address, or use a built-in example, and it returns a compact risk score with human-readable findings.
 
 ## What BaseScout Does
 
-BaseScout combines public DEX Screener market data with optional BaseScan contract intelligence.
+BaseScout combines public DEX Screener market data with optional BaseScan contract intelligence through `/api/scan`.
 
 It checks:
 
@@ -12,6 +12,7 @@ It checks:
 - Liquidity, 24h volume, 24h price change, market cap or FDV
 - Pair age and 24h transaction count
 - Optional contract verification status, deployer, deployment age, supply, and holder count from BaseScan
+- Server-side Etherscan API access using Base chain ID `8453`
 
 The result is a first-pass risk score and a list of concrete findings.
 
@@ -68,8 +69,8 @@ Verdicts:
 
 ## Current Limitations
 
-- Frontend-only MVP; there is no backend cache, queue, or private proxy.
-- Browser users can inspect any configured Vite environment variable.
+- MVP serverless API; there is no database, queue, or long-lived cache.
+- The Etherscan API key is server-only and should not use a `VITE_` prefix.
 - DEX Screener indexing can lag new pairs.
 - BaseScan holder count may require a paid API plan.
 - Holder count, deployer, supply, or creation data may be unavailable even with a key.
@@ -81,6 +82,12 @@ Verdicts:
 ```bash
 npm install
 npm run dev
+```
+
+For local testing of `/api/scan`, run the app through Vercel dev:
+
+```bash
+npx vercel dev
 ```
 
 Build:
@@ -106,31 +113,40 @@ To enable the BaseScan layer:
 3. Set:
 
 ```bash
-VITE_BASESCAN_API_KEY=your_api_key_here
+ETHERSCAN_API_KEY=your_api_key_here
 ```
 
-BaseScan uses the unified Etherscan API V2 with Base chain ID `8453`.
+BaseScout uses the unified Etherscan API V2 with Base chain ID `8453`. Keep this variable server-only and do not use a Vite-exposed prefix.
 
 ## Deployment Notes
 
 Vercel:
 
-- Set `VITE_BASESCAN_API_KEY` in Project Settings if using BaseScan checks.
+- Set `ETHERSCAN_API_KEY` in Project Settings if using BaseScan checks.
 - Use the default Vite build command: `npm run build`.
 - Use `dist` as the output directory.
 
 Netlify:
 
-- Set `VITE_BASESCAN_API_KEY` in Site configuration if using BaseScan checks.
+- Requires an equivalent serverless function setup for `/api/scan`.
+- Set `ETHERSCAN_API_KEY` in Site configuration if using BaseScan checks.
 - Build command: `npm run build`.
 - Publish directory: `dist`.
 
 Static hosting:
 
 - Run `npm run build`.
-- Upload the generated `dist` directory to any static host.
+- Uploading only `dist` is not enough for v0.4 because `/api/scan` must run on a serverless host.
 
 ## Changelog
+
+### v0.4
+
+- Serverless `/api/scan` endpoint for DEX Screener and Etherscan requests
+- Server-only `ETHERSCAN_API_KEY`
+- Removed public Vite API key handling
+- 120-second API cache headers
+- Client now consumes normalized scan API responses
 
 ### v0.3
 

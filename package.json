@@ -1,6 +1,6 @@
 {
   "name": "basescout",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,6 +15,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5.0.0",

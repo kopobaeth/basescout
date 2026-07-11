@@ -25,6 +25,17 @@ import {
   WalletCards
 } from "lucide-react";
 import "./styles.css";
+import type {
+  BaseScanIntelligence,
+  BaseScanStatus,
+  BaseScanUnavailableReason,
+  DexPair,
+  DexToken,
+  Finding,
+  FindingTone,
+  ScanApiResponse,
+  ScanResult
+} from "./types";
 
 declare global {
   interface Window {
@@ -32,96 +43,11 @@ declare global {
   }
 }
 
-type DexPair = {
-  chainId: string;
-  dexId?: string;
-  url?: string;
-  pairAddress?: string;
-  pairCreatedAt?: number;
-  baseToken?: DexToken;
-  quoteToken?: DexToken;
-  priceUsd?: string;
-  liquidity?: {
-    usd?: number;
-  };
-  volume?: {
-    h24?: number;
-  };
-  priceChange?: {
-    h24?: number;
-  };
-  txns?: {
-    h24?: {
-      buys?: number;
-      sells?: number;
-    };
-  };
-  marketCap?: number;
-  fdv?: number;
-};
-
-type DexResponse = {
-  pairs?: DexPair[] | null;
-};
-
-type DexToken = {
-  address?: string;
-  name?: string;
-  symbol?: string;
-};
-
-type FindingTone = "positive" | "warning" | "danger" | "neutral";
-
-type Finding = {
-  title: string;
-  detail: string;
-  delta: number;
-  tone: FindingTone;
-};
-
-type ScanResult = {
-  pair: DexPair;
-  targetToken: DexToken;
-  baseScan: BaseScanIntelligence;
-  score: number;
-  verdict: string;
-  findings: Finding[];
-};
-
 type ScanStatus = "idle" | "loading" | "success" | "error";
 type CopyState = "idle" | "copied" | "failed";
-type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
-type VerificationStatus = "verified" | "unverified" | "unknown";
-type BaseScanUnavailableReason =
-  | "missing-key"
-  | "request-failed"
-  | "invalid-key"
-  | "rate-limited"
-  | "endpoint-unavailable"
-  | "plan-restricted"
-  | "no-data";
-
-type BaseScanIntelligence = {
-  status: BaseScanStatus;
-  reason?: BaseScanUnavailableReason;
-  verificationStatus: VerificationStatus;
-  contractName?: string;
-  deployer?: string;
-  creationTxHash?: string;
-  createdAt?: number;
-  tokenSupply?: string;
-  holderCount?: number;
-  holderCountUnavailableReason?: BaseScanUnavailableReason;
-  tokenSupplyUnavailableReason?: BaseScanUnavailableReason;
-  creationUnavailableReason?: BaseScanUnavailableReason;
-  note?: string;
-};
 
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const REQUEST_TIMEOUT_MS = 15_000;
-const BASESCAN_TIMEOUT_MS = 8_000;
-const BASESCAN_API_URL = "https://api.etherscan.io/v2/api";
-const BASE_CHAIN_ID = "8453";
 const EXAMPLE_TOKENS = [
   {
     symbol: "AERO",
@@ -146,17 +72,6 @@ const EXAMPLE_TOKENS = [
   }
 ];
 
-class BaseScanApiError extends Error {
-  reason: BaseScanUnavailableReason;
-  endpoint: string;
-
-  constructor(reason: BaseScanUnavailableReason, endpoint: string, message: string) {
-    super(message);
-    this.reason = reason;
-    this.endpoint = endpoint;
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -165,31 +80,10 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
-function numberValue(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function numericStringValue(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value !== "string") return undefined;
-  return value.trim() ? value : undefined;
-}
-
-function integerFromString(value: unknown) {
-  const text = numericStringValue(value);
-  if (!text) return undefined;
-  const parsed = Number.parseInt(text, 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function getBaseScanApiKey() {
-  return import.meta.env.VITE_BASESCAN_API_KEY?.trim();
-}
-
 function emptyBaseScanIntelligence(status: BaseScanStatus = "idle", reason?: BaseScanIntelligence["reason"]): BaseScanIntelligence {
   const unavailableNote =
     reason === "missing-key"
-      ? "BaseScan checks unavailable. Add VITE_BASESCAN_API_KEY to enable contract intelligence."
+      ? "BaseScan checks unavailable. Server API key is not configured."
       : reason === "invalid-key"
         ? "BaseScan checks unavailable. The configured API key appears invalid."
         : reason === "rate-limited"
@@ -214,309 +108,52 @@ function baseScanUrlFor(address?: string) {
   return address ? `https://basescan.org/token/${address}` : undefined;
 }
 
-function parseDexToken(value: unknown): DexToken | undefined {
+function parseScanApiResponse(value: unknown): ScanApiResponse | undefined {
   if (!isRecord(value)) return undefined;
-
-  const token: DexToken = {
-    address: stringValue(value.address),
-    name: stringValue(value.name),
-    symbol: stringValue(value.symbol)
-  };
-
-  return token.address || token.name || token.symbol ? token : undefined;
-}
-
-function parseDexPair(value: unknown): DexPair | undefined {
-  if (!isRecord(value)) return undefined;
-
-  const chainId = stringValue(value.chainId);
-  if (!chainId) return undefined;
-
-  const liquidity = isRecord(value.liquidity) ? numberValue(value.liquidity.usd) : undefined;
-  const volume = isRecord(value.volume) ? numberValue(value.volume.h24) : undefined;
-  const priceChange = isRecord(value.priceChange) ? numberValue(value.priceChange.h24) : undefined;
-  const h24Txns = isRecord(value.txns) && isRecord(value.txns.h24) ? value.txns.h24 : undefined;
-  const buys = isRecord(h24Txns) ? numberValue(h24Txns.buys) : undefined;
-  const sells = isRecord(h24Txns) ? numberValue(h24Txns.sells) : undefined;
-  const rawPriceUsd = value.priceUsd;
+  const pair = isRecord(value.pair) ? (value.pair as DexPair) : null;
+  const baseScan = isRecord(value.baseScan)
+    ? (value.baseScan as BaseScanIntelligence)
+    : emptyBaseScanIntelligence("unavailable", "request-failed");
 
   return {
-    chainId,
-    dexId: stringValue(value.dexId),
-    url: stringValue(value.url),
-    pairAddress: stringValue(value.pairAddress),
-    pairCreatedAt: numberValue(value.pairCreatedAt),
-    baseToken: parseDexToken(value.baseToken),
-    quoteToken: parseDexToken(value.quoteToken),
-    priceUsd:
-      typeof rawPriceUsd === "string"
-        ? rawPriceUsd
-        : typeof rawPriceUsd === "number" && Number.isFinite(rawPriceUsd)
-          ? String(rawPriceUsd)
-          : undefined,
-    liquidity: liquidity === undefined ? undefined : { usd: liquidity },
-    volume: volume === undefined ? undefined : { h24: volume },
-    priceChange: priceChange === undefined ? undefined : { h24: priceChange },
-    txns: buys === undefined && sells === undefined ? undefined : { h24: { buys, sells } },
-    marketCap: numberValue(value.marketCap),
-    fdv: numberValue(value.fdv)
+    address: stringValue(value.address) ?? "",
+    pair,
+    baseScan,
+    error: stringValue(value.error),
+    errors: isRecord(value.errors)
+      ? {
+          dex: stringValue(value.errors.dex),
+          baseScan: stringValue(value.errors.baseScan)
+        }
+      : undefined
   };
 }
 
-function parseDexResponse(value: unknown): DexResponse {
-  if (!isRecord(value)) return { pairs: [] };
-  if (!Array.isArray(value.pairs)) return { pairs: [] };
-
-  return {
-    pairs: value.pairs.map(parseDexPair).filter((pair): pair is DexPair => Boolean(pair))
-  };
+function scanHttpErrorMessage(status: number, payload?: ScanApiResponse) {
+  if (payload?.error) return payload.error;
+  if (status === 400) return "Enter a valid EVM contract address.";
+  if (status === 404) return noBasePairMessage();
+  if (status === 429) return "Scan API is rate limiting requests. Try again shortly.";
+  if (status >= 500) return "Scan API is unavailable. Try again shortly.";
+  return `Scan API returned HTTP ${status}. Try again shortly.`;
 }
 
-function parseBaseScanArrayResult(value: unknown) {
-  if (!isRecord(value)) return [];
-  const result = value.result;
-  return Array.isArray(result) ? result.filter(isRecord) : [];
-}
-
-function parseBaseScanStringResult(value: unknown) {
-  if (!isRecord(value)) return undefined;
-  return numericStringValue(value.result);
-}
-
-function parseHexInteger(value: unknown) {
-  if (typeof value !== "string") return undefined;
-  const parsed = Number.parseInt(value, value.startsWith("0x") ? 16 : 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function baseScanEndpointName(params: Record<string, string>) {
-  return `${params.module ?? "unknown"}.${params.action ?? "unknown"}`;
-}
-
-function baseScanMessage(value: unknown) {
-  if (!isRecord(value)) return "Invalid BaseScan response";
-  const message = stringValue(value.message);
-  const result = value.result;
-  const resultText = typeof result === "string" ? result : undefined;
-  return [message, resultText].filter(Boolean).join(" - ") || "BaseScan request failed";
-}
-
-function warnBaseScan(endpoint: string, message: string) {
-  console.warn(`[BaseScout] BaseScan ${endpoint}: ${message}`);
-}
-
-function getBaseScanErrorReason(value: unknown): BaseScanUnavailableReason | undefined {
-  if (!isRecord(value)) return undefined;
-  const status = stringValue(value.status);
-  if (status !== "0") return undefined;
-
-  const message = `${stringValue(value.message) ?? ""} ${stringValue(value.result) ?? ""}`.toLowerCase();
-  if (message.includes("invalid") && message.includes("key")) return "invalid-key";
-  if (message.includes("rate") || message.includes("limit") || message.includes("throttle")) return "rate-limited";
-  if (message.includes("pro") || message.includes("paid") || message.includes("plan") || message.includes("subscription")) {
-    return "plan-restricted";
-  }
-  if (message.includes("not supported") || message.includes("not available") || message.includes("unavailable") || message.includes("deprecated")) {
-    return "endpoint-unavailable";
-  }
-  if (message.includes("no data") || message.includes("not found") || message.includes("no records")) return "no-data";
-  return "request-failed";
-}
-
-function hasVerifiedSource(sourceRecord: Record<string, unknown> | undefined) {
-  if (!sourceRecord) return undefined;
-  const sourceCode = stringValue(sourceRecord.SourceCode)?.trim();
-  const abi = stringValue(sourceRecord.ABI)?.trim();
-  return Boolean(sourceCode) && abi !== "Contract source code not verified";
-}
-
-function buildBaseScanApiUrl(params: Record<string, string>) {
-  const url = new URL(BASESCAN_API_URL);
-  url.searchParams.set("chainid", BASE_CHAIN_ID);
-
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, value);
-  });
-
-  return url;
-}
-
-function dexHttpErrorMessage(status: number) {
-  if (status === 429) return "DEX Screener is rate limiting requests. Try again shortly.";
-  if (status >= 500) return "DEX Screener appears down or degraded. Try again shortly.";
-  return `DEX Screener returned HTTP ${status}. Try again shortly.`;
-}
-
-function dexErrorMessage(error: unknown) {
+function scanRequestErrorMessage(error: unknown) {
   if (error instanceof DOMException && error.name === "AbortError") {
-    return "DEX Screener request timed out. Try again shortly.";
+    return "Scan request timed out. Try again shortly.";
   }
 
   if (error instanceof TypeError) {
-    return "DEX Screener is unreachable. Check your connection or try again shortly.";
+    return "Scan API is unreachable. Check your connection or try again shortly.";
   }
 
   if (error instanceof Error) return error.message;
 
-  return "DEX Screener scan failed. Try again shortly.";
+  return "Scan failed. Try again shortly.";
 }
 
 function noBasePairMessage() {
   return "No Base pair found for this token. Confirm the contract is deployed on Base and has an indexed DEX pair.";
-}
-
-async function fetchBaseScanJson(params: Record<string, string>, signal: AbortSignal) {
-  const endpoint = baseScanEndpointName(params);
-  const apiKey = getBaseScanApiKey();
-  if (!apiKey) throw new BaseScanApiError("missing-key", endpoint, "Missing BaseScan API key");
-
-  const url = buildBaseScanApiUrl({
-    ...params,
-    apikey: apiKey
-  });
-  const response = await fetch(url, { signal });
-
-  if (!response.ok) {
-    const reason = response.status === 429 ? "rate-limited" : response.status >= 500 ? "endpoint-unavailable" : "request-failed";
-    const message = `HTTP ${response.status}`;
-    warnBaseScan(endpoint, message);
-    throw new BaseScanApiError(reason, endpoint, message);
-  }
-
-  const json = (await response.json()) as unknown;
-  const reason = getBaseScanErrorReason(json);
-  if (reason) {
-    const message = baseScanMessage(json);
-    warnBaseScan(endpoint, message);
-    throw new BaseScanApiError(reason, endpoint, message);
-  }
-
-  return json;
-}
-
-async function withBaseScanTimeout<T>(parentSignal: AbortSignal, task: (signal: AbortSignal) => Promise<T>) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), BASESCAN_TIMEOUT_MS);
-  const abortFromParent = () => controller.abort();
-  parentSignal.addEventListener("abort", abortFromParent, { once: true });
-
-  try {
-    return await task(controller.signal);
-  } finally {
-    window.clearTimeout(timeoutId);
-    parentSignal.removeEventListener("abort", abortFromParent);
-  }
-}
-
-function rejectedBaseScanReason(result: PromiseSettledResult<unknown>): BaseScanUnavailableReason | undefined {
-  return result.status === "rejected" && result.reason instanceof BaseScanApiError
-    ? result.reason.reason
-    : undefined;
-}
-
-async function fetchCreationTimestamp(txHash: string | undefined, signal: AbortSignal) {
-  if (!txHash) return undefined;
-
-  try {
-    const txJson = await fetchBaseScanJson(
-      { module: "proxy", action: "eth_getTransactionByHash", txhash: txHash },
-      signal
-    );
-    const txResult = isRecord(txJson) && isRecord(txJson.result) ? txJson.result : undefined;
-    const blockNumber = stringValue(txResult?.blockNumber);
-    if (!blockNumber) return undefined;
-
-    const blockJson = await fetchBaseScanJson(
-      { module: "proxy", action: "eth_getBlockByNumber", tag: blockNumber, boolean: "false" },
-      signal
-    );
-    const blockResult = isRecord(blockJson) && isRecord(blockJson.result) ? blockJson.result : undefined;
-    const timestamp = parseHexInteger(blockResult?.timestamp);
-    return timestamp ? timestamp * 1000 : undefined;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Creation timestamp lookup failed";
-    warnBaseScan("proxy.creationTimestamp", message);
-    return undefined;
-  }
-}
-
-async function fetchBaseScanIntelligence(tokenAddress: string, parentSignal: AbortSignal): Promise<BaseScanIntelligence> {
-  if (!getBaseScanApiKey()) {
-    return emptyBaseScanIntelligence("unavailable", "missing-key");
-  }
-
-  return withBaseScanTimeout(parentSignal, async (signal) => {
-    const [sourceResult, creationResult, supplyResult, holderResult] = await Promise.allSettled([
-      fetchBaseScanJson({ module: "contract", action: "getsourcecode", address: tokenAddress }, signal),
-      fetchBaseScanJson({ module: "contract", action: "getcontractcreation", contractaddresses: tokenAddress }, signal),
-      fetchBaseScanJson({ module: "stats", action: "tokensupply", contractaddress: tokenAddress }, signal),
-      fetchBaseScanJson({ module: "token", action: "tokenholdercount", contractaddress: tokenAddress }, signal)
-    ]);
-
-    const fulfilled = [sourceResult, creationResult, supplyResult, holderResult].filter(
-      (result) => result.status === "fulfilled"
-    );
-
-    if (!fulfilled.length) {
-      const firstFailure = [sourceResult, creationResult, supplyResult, holderResult].find(
-        (result): result is PromiseRejectedResult => result.status === "rejected"
-      );
-      const reason =
-        firstFailure?.reason instanceof BaseScanApiError ? firstFailure.reason.reason : "request-failed";
-      return emptyBaseScanIntelligence("unavailable", reason);
-    }
-
-    const sourceRecord =
-      sourceResult.status === "fulfilled" ? parseBaseScanArrayResult(sourceResult.value)[0] : undefined;
-    const creationRecord =
-      creationResult.status === "fulfilled" ? parseBaseScanArrayResult(creationResult.value)[0] : undefined;
-    const verified = hasVerifiedSource(sourceRecord);
-    const createdAtSeconds = integerFromString(creationRecord?.timestamp);
-    const creationTxHash = stringValue(creationRecord?.txHash);
-    const createdAt = createdAtSeconds ? createdAtSeconds * 1000 : await fetchCreationTimestamp(creationTxHash, signal);
-    const holderCount =
-      holderResult.status === "fulfilled" ? integerFromString(parseBaseScanStringResult(holderResult.value)) : undefined;
-    const holderUnavailableReason =
-      holderResult.status === "rejected" ? rejectedBaseScanReason(holderResult) : holderCount === undefined ? "no-data" : undefined;
-    const supplyUnavailableReason = rejectedBaseScanReason(supplyResult);
-    const creationUnavailableReason = rejectedBaseScanReason(creationResult);
-    const hasPlanRestrictedField = [holderUnavailableReason, supplyUnavailableReason, creationUnavailableReason].includes("plan-restricted");
-
-    const intelligence: BaseScanIntelligence = {
-      status: "available",
-      verificationStatus: verified === undefined ? "unknown" : verified ? "verified" : "unverified",
-      contractName: stringValue(sourceRecord?.ContractName),
-      deployer: stringValue(creationRecord?.contractCreator),
-      creationTxHash,
-      createdAt,
-      tokenSupply: supplyResult.status === "fulfilled" ? parseBaseScanStringResult(supplyResult.value) : undefined,
-      holderCount,
-      holderCountUnavailableReason: holderCount === undefined ? holderUnavailableReason : undefined,
-      tokenSupplyUnavailableReason:
-        supplyResult.status === "rejected" || (supplyResult.status === "fulfilled" && !parseBaseScanStringResult(supplyResult.value))
-          ? supplyUnavailableReason ?? "no-data"
-          : undefined,
-      creationUnavailableReason:
-        creationResult.status === "rejected" || !createdAt
-          ? creationUnavailableReason ?? "no-data"
-          : undefined,
-      note:
-        hasPlanRestrictedField
-          ? "Some BaseScan intelligence fields require higher API access."
-          : holderResult.status === "rejected"
-          ? holderResult.reason instanceof BaseScanApiError && holderResult.reason.reason === "rate-limited"
-            ? "Holder count unavailable. BaseScan rate limited this endpoint."
-            : "Holder count unavailable. BaseScan holder count may require a paid API plan."
-          : undefined
-    };
-
-    return intelligence;
-  }).catch((error) =>
-    emptyBaseScanIntelligence(
-      "unavailable",
-      error instanceof BaseScanApiError ? error.reason : "request-failed"
-    )
-  );
 }
 
 function currency(value: number | undefined, compact = false) {
@@ -934,14 +571,6 @@ function calculateRisk(pair: DexPair, tokenAddress: string, baseScan: BaseScanIn
   };
 }
 
-function pickBestBasePair(pairs: DexPair[], tokenAddress: string) {
-  const basePairs = pairs.filter(
-    (pair) => pair.chainId === "base" && sameAddress(pair.baseToken?.address, tokenAddress)
-  );
-
-  return [...basePairs].sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
-}
-
 async function writeClipboardText(text: string) {
   if (navigator.clipboard?.writeText) {
     try {
@@ -1043,7 +672,7 @@ function App() {
     setAddress(tokenAddress);
     setError("");
     setCopyState("idle");
-    setBaseScan(getBaseScanApiKey() ? emptyBaseScanIntelligence("loading") : emptyBaseScanIntelligence("unavailable", "missing-key"));
+    setBaseScan(emptyBaseScanIntelligence("loading"));
 
     if (!ADDRESS_PATTERN.test(tokenAddress)) {
       setStatus("error");
@@ -1060,48 +689,31 @@ function App() {
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const [dexResult, baseScanResult] = await Promise.allSettled([
-        fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`, {
-          signal: controller.signal
-        }),
-        fetchBaseScanIntelligence(tokenAddress, controller.signal)
-      ]);
+      const response = await fetch(`/api/scan?address=${encodeURIComponent(tokenAddress)}`, {
+        signal: controller.signal
+      });
+      const payload = parseScanApiResponse(await response.json());
+      const baseScanIntelligence = payload?.baseScan ?? emptyBaseScanIntelligence("unavailable", "request-failed");
 
-      const baseScanIntelligence =
-        baseScanResult.status === "fulfilled"
-          ? baseScanResult.value
-          : emptyBaseScanIntelligence("unavailable", "request-failed");
+      if (!response.ok) {
+        throw new Error(scanHttpErrorMessage(response.status, payload));
+      }
 
       if (scanId !== scanIdRef.current) return;
       setBaseScan(baseScanIntelligence);
 
-      if (dexResult.status === "rejected") {
-        throw dexResult.reason;
-      }
-
-      const response = dexResult.value;
-      if (!response.ok) {
-        throw new Error(dexHttpErrorMessage(response.status));
-      }
-
-      const data = parseDexResponse(await response.json());
-      const pairs = data.pairs ?? [];
-      const bestPair = pickBestBasePair(pairs, tokenAddress);
-
-      if (scanId !== scanIdRef.current) return;
-
-      if (!bestPair) {
+      if (!payload?.pair) {
         setStatus("error");
-        setError(noBasePairMessage());
+        setError(payload?.error ?? noBasePairMessage());
         return;
       }
 
-      setResult(calculateRisk(bestPair, tokenAddress, baseScanIntelligence));
+      setResult(calculateRisk(payload.pair, tokenAddress, baseScanIntelligence));
       setStatus("success");
     } catch (scanError) {
       if (scanId !== scanIdRef.current) return;
       setStatus("error");
-      setError(dexErrorMessage(scanError));
+      setError(scanRequestErrorMessage(scanError));
     } finally {
       window.clearTimeout(timeoutId);
       if (activeRequestRef.current === controller) {
