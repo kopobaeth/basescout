@@ -9,7 +9,8 @@ export default defineConfig({
       name: "basescout-api-dev",
       configureServer(server) {
         server.middlewares.use((request, response, next) => {
-          if (request.url?.startsWith("/api/scan")) {
+          const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+          if (pathname === "/api/scan") {
             void scanHandler(request, response);
             return;
           }

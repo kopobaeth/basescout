@@ -129,6 +129,17 @@ function parseScanApiResponse(value: unknown): ScanApiResponse | undefined {
   };
 }
 
+async function readScanApiResponse(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return undefined;
+
+  try {
+    return parseScanApiResponse(await response.json());
+  } catch {
+    return undefined;
+  }
+}
+
 function scanHttpErrorMessage(status: number, payload?: ScanApiResponse) {
   if (payload?.error) return payload.error;
   if (status === 400) return "Enter a valid EVM contract address.";
@@ -692,7 +703,7 @@ function App() {
       const response = await fetch(`/api/scan?address=${encodeURIComponent(tokenAddress)}`, {
         signal: controller.signal
       });
-      const payload = parseScanApiResponse(await response.json());
+      const payload = await readScanApiResponse(response);
       const baseScanIntelligence = payload?.baseScan ?? emptyBaseScanIntelligence("unavailable", "request-failed");
 
       if (!response.ok) {

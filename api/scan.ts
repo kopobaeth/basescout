@@ -421,61 +421,66 @@ function requestUrl(request: IncomingMessage) {
 }
 
 export default async function handler(request: IncomingMessage, response: ServerResponse) {
-  if (request.method !== "GET") {
-    response.setHeader("Allow", "GET");
-    sendJson(response, 405, { error: "Method not allowed." });
-    return;
-  }
+  try {
+    if (request.method !== "GET") {
+      response.setHeader("Allow", "GET");
+      sendJson(response, 405, { error: "Method not allowed." });
+      return;
+    }
 
-  const url = requestUrl(request);
-  const address = url.searchParams.get("address")?.trim() ?? "";
+    const url = requestUrl(request);
+    const address = url.searchParams.get("address")?.trim() ?? "";
 
-  if (!ADDRESS_PATTERN.test(address)) {
-    sendJson(response, 400, { error: "Enter a valid EVM contract address." });
-    return;
-  }
+    if (!ADDRESS_PATTERN.test(address)) {
+      sendJson(response, 400, { error: "Enter a valid EVM contract address." });
+      return;
+    }
 
-  const [dexResult, baseScanResult] = await Promise.allSettled([
-    fetchDexPair(address),
-    fetchBaseScanIntelligence(address)
-  ]);
-  const baseScan =
-    baseScanResult.status === "fulfilled"
-      ? baseScanResult.value
-      : emptyBaseScanIntelligence("unavailable", "request-failed");
-  const errors: ScanApiResponse["errors"] = {};
+    const [dexResult, baseScanResult] = await Promise.allSettled([
+      fetchDexPair(address),
+      fetchBaseScanIntelligence(address)
+    ]);
+    const baseScan =
+      baseScanResult.status === "fulfilled"
+        ? baseScanResult.value
+        : emptyBaseScanIntelligence("unavailable", "request-failed");
+    const errors: ScanApiResponse["errors"] = {};
 
-  if (baseScanResult.status === "rejected") {
-    errors.baseScan = baseScanResult.reason instanceof Error ? baseScanResult.reason.message : "BaseScan checks failed.";
-  }
+    if (baseScanResult.status === "rejected") {
+      errors.baseScan = "BaseScan checks failed.";
+    }
 
-  if (dexResult.status === "rejected") {
-    const message = scanErrorMessage(dexResult.reason);
-    sendJson(response, 502, {
+    if (dexResult.status === "rejected") {
+      const message = scanErrorMessage(dexResult.reason);
+      sendJson(response, 502, {
+        address,
+        pair: null,
+        baseScan,
+        error: message,
+        errors: { ...errors, dex: message }
+      });
+      return;
+    }
+
+    if (!dexResult.value) {
+      sendJson(response, 404, {
+        address,
+        pair: null,
+        baseScan,
+        error: noBasePairMessage(),
+        errors: Object.keys(errors).length ? errors : undefined
+      });
+      return;
+    }
+
+    sendJson(response, 200, {
       address,
-      pair: null,
+      pair: dexResult.value,
       baseScan,
-      error: message,
-      errors: { ...errors, dex: message }
-    });
-    return;
-  }
-
-  if (!dexResult.value) {
-    sendJson(response, 404, {
-      address,
-      pair: null,
-      baseScan,
-      error: noBasePairMessage(),
       errors: Object.keys(errors).length ? errors : undefined
     });
-    return;
+  } catch (error) {
+    console.error("[BaseScout] Scan API failed");
+    sendJson(response, 500, { error: "Scan API is unavailable. Try again shortly." });
   }
-
-  sendJson(response, 200, {
-    address,
-    pair: dexResult.value,
-    baseScan,
-    errors: Object.keys(errors).length ? errors : undefined
-  });
 }
