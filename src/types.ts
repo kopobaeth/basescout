@@ -30,6 +30,9 @@ export type DexPair = {
   };
   marketCap?: number;
   fdv?: number;
+  info?: {
+    imageUrl?: string;
+  };
 };
 
 export type FindingTone = "positive" | "warning" | "danger" | "neutral";
@@ -77,13 +80,31 @@ export type ScanResult = {
   findings: Finding[];
 };
 
+export type ScanErrorCode =
+  | "invalid_address"
+  | "no_base_pair"
+  | "api_timeout"
+  | "rate_limit"
+  | "partial_contract_intelligence_failure"
+  | "unexpected_server_error";
+
 export type ScanApiResponse = {
   address: string;
   pair: DexPair | null;
   baseScan: BaseScanIntelligence;
   error?: string;
+  errorCode?: ScanErrorCode;
   errors?: {
     dex?: string;
     baseScan?: string;
   };
+};
+
+export type ScanHistoryItem = {
+  address: string;
+  shortAddress: string;
+  symbol: string;
+  timestamp: number;
+  riskScore: number;
+  tokenLogo?: string;
 };

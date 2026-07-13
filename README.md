@@ -13,6 +13,8 @@ It checks:
 - Pair age and 24h transaction count
 - Optional contract verification status, deployer, deployment age, supply, and holder count from BaseScan
 - Server-side Etherscan API access using Base chain ID `8453`
+- Recent successful scans stored locally in the browser
+- Vercel Analytics page tracking and PostHog product events when configured
 
 The result is a first-pass risk score and a list of concrete findings.
 
@@ -71,6 +73,8 @@ Verdicts:
 
 - MVP serverless API; there is no database, queue, or long-lived cache.
 - The Etherscan API key is server-only and should not use a `VITE_` prefix.
+- Recent scans are browser-local and clear when localStorage is cleared.
+- PostHog event payloads send token symbols and shortened addresses only.
 - DEX Screener indexing can lag new pairs.
 - BaseScan holder count may require a paid API plan.
 - Holder count, deployer, supply, or creation data may be unavailable even with a key.
@@ -118,6 +122,29 @@ ETHERSCAN_API_KEY=your_api_key_here
 
 BaseScout uses the unified Etherscan API V2 with Base chain ID `8453`. Keep this variable server-only and do not use a Vite-exposed prefix.
 
+## Configure Analytics
+
+Vercel Analytics is installed through `@vercel/analytics` and rendered once in the React root.
+
+PostHog is optional. To enable product event tracking, set:
+
+```bash
+VITE_POSTHOG_KEY=your_project_api_key
+VITE_POSTHOG_HOST=https://us.i.posthog.com
+```
+
+Tracked events:
+
+- `scan_clicked`
+- `scan_success`
+- `scan_failed`
+- `example_token_clicked`
+- `copy_pair_address`
+- `open_basescan`
+- `open_dexscreener`
+
+Event payloads avoid full token addresses. They include the token symbol when available and a shortened address such as `0x1234...abcd`.
+
 ## Deployment Notes
 
 Vercel:
@@ -139,6 +166,15 @@ Static hosting:
 - Uploading only `dist` is not enough for v0.4 because `/api/scan` must run on a serverless host.
 
 ## Changelog
+
+### v0.5
+
+- Added PostHog initialization using `VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST`
+- Confirmed Vercel Analytics is installed and mounted once
+- Added analytics events for scans, example clicks, copy, BaseScan opens, and DEX Screener opens
+- Added typed UI messages for invalid addresses, no Base liquidity pair, API timeout, rate limit, partial contract intelligence failure, and unexpected server errors
+- Added loading skeletons and duplicate-scan prevention
+- Added local recent scan history with latest 10 successful scans, rescan, and clear history controls
 
 ### v0.4
 

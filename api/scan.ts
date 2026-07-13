@@ -5,6 +5,7 @@ import type {
   BaseScanUnavailableReason,
   DexPair,
   DexToken,
+  ScanErrorCode,
   ScanApiResponse
 } from "../src/types";
 
@@ -72,16 +73,18 @@ function emptyBaseScanIntelligence(status: BaseScanStatus = "idle", reason?: Bas
     reason === "missing-key"
       ? "BaseScan checks unavailable. Server API key is not configured."
       : reason === "invalid-key"
-        ? "BaseScan checks unavailable. The configured API key appears invalid."
+        ? "Partial contract intelligence failure. The configured BaseScan API key appears invalid."
         : reason === "rate-limited"
-          ? "BaseScan checks unavailable. The API key is rate limited."
+          ? "Rate limit reached. Liquidity scan completed; BaseScan contract intelligence is partial."
           : reason === "endpoint-unavailable"
-            ? "BaseScan checks unavailable. One or more API endpoints are unavailable."
+            ? "Partial contract intelligence failure. One or more BaseScan endpoints are unavailable."
             : reason === "plan-restricted"
-              ? "Some BaseScan intelligence fields require higher API access."
+              ? "Partial contract intelligence unavailable. Some fields require higher API access."
               : reason === "no-data"
-                ? "BaseScan checks unavailable. No contract data was returned."
-                : "BaseScan checks unavailable. DEX Screener analysis is still available.";
+                ? "BaseScan contract intelligence unavailable. No contract data was returned."
+                : reason === "request-failed"
+                  ? "Partial contract intelligence failure. Liquidity analysis completed, but BaseScan checks did not return."
+                  : "BaseScan checks unavailable. DEX Screener analysis is still available.";
 
   return {
     status,
@@ -116,6 +119,7 @@ function parseDexPair(value: unknown): DexPair | undefined {
   const buys = isRecord(h24Txns) ? numberValue(h24Txns.buys) : undefined;
   const sells = isRecord(h24Txns) ? numberValue(h24Txns.sells) : undefined;
   const rawPriceUsd = value.priceUsd;
+  const imageUrl = isRecord(value.info) ? stringValue(value.info.imageUrl) : undefined;
 
   return {
     chainId,
@@ -136,7 +140,8 @@ function parseDexPair(value: unknown): DexPair | undefined {
     priceChange: priceChange === undefined ? undefined : { h24: priceChange },
     txns: buys === undefined && sells === undefined ? undefined : { h24: { buys, sells } },
     marketCap: numberValue(value.marketCap),
-    fdv: numberValue(value.fdv)
+    fdv: numberValue(value.fdv),
+    info: imageUrl ? { imageUrl } : undefined
   };
 }
 
@@ -390,15 +395,29 @@ async function fetchBaseScanIntelligence(tokenAddress: string): Promise<BaseScan
   };
 }
 
-function scanErrorMessage(error: unknown) {
+function scanErrorDetails(error: unknown): { error: string; errorCode: ScanErrorCode } {
   if (error instanceof ScanApiError && error.status === 429) {
-    return "DEX Screener is rate limiting requests. Try again shortly.";
+    return {
+      error: "Rate limit reached. Wait briefly before scanning again.",
+      errorCode: "rate_limit"
+    };
+  }
+  if (error instanceof ScanApiError && !error.status && error.message.toLowerCase().includes("timed out")) {
+    return {
+      error: "API timeout. DEX Screener did not respond before the request limit.",
+      errorCode: "api_timeout"
+    };
   }
   if (error instanceof ScanApiError && error.status && error.status >= 500) {
-    return "DEX Screener appears down or degraded. Try again shortly.";
+    return {
+      error: "Unexpected server error. DEX Screener appears down or degraded.",
+      errorCode: "unexpected_server_error"
+    };
   }
-  if (error instanceof Error) return error.message;
-  return "DEX Screener scan failed. Try again shortly.";
+  return {
+    error: error instanceof Error ? error.message : "Unexpected server error. DEX Screener scan failed.",
+    errorCode: "unexpected_server_error"
+  };
 }
 
 function noBasePairMessage() {
@@ -410,7 +429,7 @@ function withCacheHeaders(response: ServerResponse) {
   response.setHeader("Cache-Control", "public, max-age=0, s-maxage=120, stale-while-revalidate=60");
 }
 
-function sendJson(response: ServerResponse, status: number, payload: ScanApiResponse | { error: string }) {
+function sendJson(response: ServerResponse, status: number, payload: ScanApiResponse | { error: string; errorCode?: ScanErrorCode }) {
   withCacheHeaders(response);
   response.statusCode = status;
   response.end(JSON.stringify(payload));
@@ -432,7 +451,10 @@ export default async function handler(request: IncomingMessage, response: Server
     const address = url.searchParams.get("address")?.trim() ?? "";
 
     if (!ADDRESS_PATTERN.test(address)) {
-      sendJson(response, 400, { error: "Enter a valid EVM contract address." });
+      sendJson(response, 400, {
+        error: "Invalid address. Enter a 0x token contract with 40 hexadecimal characters.",
+        errorCode: "invalid_address"
+      });
       return;
     }
 
@@ -447,17 +469,24 @@ export default async function handler(request: IncomingMessage, response: Server
     const errors: ScanApiResponse["errors"] = {};
 
     if (baseScanResult.status === "rejected") {
-      errors.baseScan = "BaseScan checks failed.";
+      errors.baseScan = "Partial contract intelligence failure.";
+    } else if (
+      baseScan.status === "unavailable" &&
+      baseScan.reason &&
+      !["missing-key", "no-data"].includes(baseScan.reason)
+    ) {
+      errors.baseScan = "Partial contract intelligence failure.";
     }
 
     if (dexResult.status === "rejected") {
-      const message = scanErrorMessage(dexResult.reason);
+      const details = scanErrorDetails(dexResult.reason);
       sendJson(response, 502, {
         address,
         pair: null,
         baseScan,
-        error: message,
-        errors: { ...errors, dex: message }
+        error: details.error,
+        errorCode: details.errorCode,
+        errors: { ...errors, dex: details.error }
       });
       return;
     }
@@ -468,6 +497,7 @@ export default async function handler(request: IncomingMessage, response: Server
         pair: null,
         baseScan,
         error: noBasePairMessage(),
+        errorCode: "no_base_pair",
         errors: Object.keys(errors).length ? errors : undefined
       });
       return;
@@ -481,6 +511,9 @@ export default async function handler(request: IncomingMessage, response: Server
     });
   } catch (error) {
     console.error("[BaseScout] Scan API failed");
-    sendJson(response, 500, { error: "Scan API is unavailable. Try again shortly." });
+    sendJson(response, 500, {
+      error: "Unexpected server error. Scan API could not complete the request.",
+      errorCode: "unexpected_server_error"
+    });
   }
 }
