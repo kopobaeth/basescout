@@ -6,8 +6,10 @@ import type {
   DexPair,
   DexToken,
   ScanErrorCode,
-  ScanApiResponse
+  ScanApiResponse,
+  SecurityIntelligence
 } from "../src/types";
+import { emptySecurityIntelligence, normalizeGoPlusSecurityResponse } from "../src/security";
 
 type DexResponse = {
   pairs?: DexPair[] | null;
@@ -16,8 +18,13 @@ type DexResponse = {
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const BASE_CHAIN_ID = "8453";
 const ETHERSCAN_API_URL = "https://api.etherscan.io/v2/api";
+const GOPLUS_TOKEN_SECURITY_URL = "https://api.gopluslabs.io/api/v1/token_security/8453";
 const DEX_TIMEOUT_MS = 10_000;
 const ETHERSCAN_TIMEOUT_MS = 8_000;
+const SECURITY_TIMEOUT_MS = 7_000;
+const SECURITY_CACHE_MS = 90_000;
+
+const securityCache = new Map<string, { expiresAt: number; value: SecurityIntelligence }>();
 
 class ScanApiError extends Error {
   status?: number;
@@ -214,6 +221,56 @@ async function fetchDexPairs(tokenAddress: string) {
   const json = await fetchJson(url, DEX_TIMEOUT_MS, "DEX Screener");
   const pairs = parseDexResponse(json).pairs ?? [];
   return normalizeBasePairs(pairs, tokenAddress);
+}
+
+async function fetchSecurityJson(tokenAddress: string) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SECURITY_TIMEOUT_MS);
+  const url = new URL(GOPLUS_TOKEN_SECURITY_URL);
+  url.searchParams.set("contract_addresses", tokenAddress);
+
+  const headers: Record<string, string> = { accept: "application/json" };
+  const apiKey = process.env.GOPLUS_API_KEY?.trim();
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  try {
+    const response = await fetch(url, {
+      headers,
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new ScanApiError(`GoPlus returned HTTP ${response.status}`, response.status);
+    }
+
+    return (await response.json()) as unknown;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ScanApiError("GoPlus request timed out");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchSecurityIntelligence(tokenAddress: string) {
+  const cacheKey = tokenAddress.toLowerCase();
+  const cached = securityCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  try {
+    const json = await fetchSecurityJson(tokenAddress);
+    const value = normalizeGoPlusSecurityResponse(json, tokenAddress);
+    securityCache.set(cacheKey, { expiresAt: Date.now() + SECURITY_CACHE_MS, value });
+    return value;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Security provider request failed";
+    console.warn(`[BaseScout] GoPlus security: ${message}`);
+    const value = emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
+    securityCache.set(cacheKey, { expiresAt: Date.now() + Math.floor(SECURITY_CACHE_MS / 3), value });
+    return value;
+  }
 }
 
 function parseEtherscanArrayResult(value: unknown) {
@@ -480,14 +537,19 @@ export default async function handler(request: IncomingMessage, response: Server
       return;
     }
 
-    const [dexResult, baseScanResult] = await Promise.allSettled([
+    const [dexResult, baseScanResult, securityResult] = await Promise.allSettled([
       fetchDexPairs(address),
-      fetchBaseScanIntelligence(address)
+      fetchBaseScanIntelligence(address),
+      fetchSecurityIntelligence(address)
     ]);
     const baseScan =
       baseScanResult.status === "fulfilled"
         ? baseScanResult.value
         : emptyBaseScanIntelligence("unavailable", "request-failed");
+    const security =
+      securityResult.status === "fulfilled"
+        ? securityResult.value
+        : emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
     const errors: ScanApiResponse["errors"] = {};
 
     if (baseScanResult.status === "rejected") {
@@ -500,6 +562,10 @@ export default async function handler(request: IncomingMessage, response: Server
       errors.baseScan = "Partial contract intelligence failure.";
     }
 
+    if (security.status === "unavailable") {
+      errors.security = "Security intelligence unavailable.";
+    }
+
     if (dexResult.status === "rejected") {
       const details = scanErrorDetails(dexResult.reason);
       sendJson(response, 502, {
@@ -507,6 +573,7 @@ export default async function handler(request: IncomingMessage, response: Server
         pair: null,
         pairs: [],
         baseScan,
+        security,
         error: details.error,
         errorCode: details.errorCode,
         errors: { ...errors, dex: details.error }
@@ -523,6 +590,7 @@ export default async function handler(request: IncomingMessage, response: Server
         pair: null,
         pairs,
         baseScan,
+        security,
         error: noBasePairMessage(),
         errorCode: "no_base_pair",
         errors: Object.keys(errors).length ? errors : undefined
@@ -535,6 +603,7 @@ export default async function handler(request: IncomingMessage, response: Server
       pair,
       pairs,
       baseScan,
+      security,
       errors: Object.keys(errors).length ? errors : undefined
     });
   } catch (error) {

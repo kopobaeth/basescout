@@ -1,4 +1,4 @@
-import React, { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
+import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
 import {
@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShieldQuestion,
+  ShieldX,
   Trash2,
   WalletCards
 } from "lucide-react";
@@ -37,6 +38,8 @@ import {
   removeWatchlistItem,
   upsertWatchlistItem
 } from "./watchlist";
+import { applySecurityContractRisk } from "./riskSecurity";
+import { emptySecurityIntelligence } from "./security";
 import "./styles.css";
 import type {
   BaseScanIntelligence,
@@ -50,6 +53,8 @@ import type {
   ScanHistoryItem,
   ScanResult,
   ScoreReason,
+  SecurityFinding,
+  SecurityIntelligence,
   WatchlistItem
 } from "./types";
 
@@ -183,12 +188,16 @@ function parseScanApiResponse(value: unknown): ScanApiResponse | undefined {
   const baseScan = isRecord(value.baseScan)
     ? (value.baseScan as BaseScanIntelligence)
     : emptyBaseScanIntelligence("unavailable", "request-failed");
+  const security = isRecord(value.security)
+    ? (value.security as SecurityIntelligence)
+    : emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
 
   return {
     address: stringValue(value.address) ?? "",
     pair,
     pairs,
     baseScan,
+    security,
     error: stringValue(value.error),
     errorCode: scanErrorCodeValue(value.errorCode),
     errors: isRecord(value.errors)
@@ -703,13 +712,14 @@ function calculateRisk(pair: DexPair, tokenAddress: string, baseScan: BaseScanIn
 
   const finalScore = clampScore(score);
   const verdict =
-    finalScore >= 75 ? "Looks tradable" : finalScore >= 45 ? "Proceed carefully" : "High risk";
+    finalScore >= 75 ? "Lower risk" : finalScore >= 45 ? "Moderate risk" : "High risk";
 
   return {
     pair,
     pairs: [pair],
     targetToken: getTargetToken(pair, tokenAddress),
     baseScan,
+    security: emptySecurityIntelligence(),
     score: finalScore,
     verdict,
     breakdown: {
@@ -741,7 +751,7 @@ function confidenceLabel(score: number) {
   return "Low";
 }
 
-function calculateRiskBreakdown(pair: DexPair, pairs: DexPair[], tokenAddress: string, baseScan: BaseScanIntelligence): ScanResult {
+function calculateRiskBreakdown(pair: DexPair, pairs: DexPair[], tokenAddress: string, baseScan: BaseScanIntelligence, security: SecurityIntelligence): ScanResult {
   let marketScore = 72;
   let contractScore = 72;
   const marketReasons: ScoreReason[] = [];
@@ -915,6 +925,17 @@ function calculateRiskBreakdown(pair: DexPair, pairs: DexPair[], tokenAddress: s
     }
   }
 
+  if (security.status === "available" || security.status === "partial") {
+    complete("Security intelligence");
+  } else {
+    unavailable("Security intelligence");
+  }
+
+  security.unavailableChecks.forEach((key) => unavailable(`Security: ${key}`));
+  const securityRisk = applySecurityContractRisk(contractScore, security);
+  contractScore = securityRisk.score;
+  contractReasons.push(...securityRisk.reasons);
+
   const clampedMarketScore = clampScore(marketScore);
   const clampedContractScore = clampScore(contractScore);
   const totalChecks = completedChecks.length + unavailableChecks.length;
@@ -928,7 +949,16 @@ function calculateRiskBreakdown(pair: DexPair, pairs: DexPair[], tokenAddress: s
   }
 
   const overallScore = clampScore(Math.round(clampedMarketScore * 0.55 + clampedContractScore * 0.35 + confidenceScore * 0.1));
-  const verdict = overallScore >= 75 ? "Looks tradable" : overallScore >= 45 ? "Proceed carefully" : "High risk";
+  const verdict =
+    confidenceScore < 35
+      ? "Insufficient data"
+      : security.criticalCount > 0 || overallScore < 25
+        ? "Critical risk"
+        : overallScore >= 75
+          ? "Lower risk"
+          : overallScore >= 45
+            ? "Moderate risk"
+            : "High risk";
   const findings: Finding[] = [...marketReasons, ...contractReasons, ...confidenceReasons];
 
   return {
@@ -936,6 +966,7 @@ function calculateRiskBreakdown(pair: DexPair, pairs: DexPair[], tokenAddress: s
     pairs,
     targetToken: getTargetToken(pair, tokenAddress),
     baseScan,
+    security,
     score: overallScore,
     verdict,
     breakdown: {
@@ -1001,6 +1032,7 @@ function App() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => readWatchlist());
   const activeRequestRef = useRef<AbortController | null>(null);
   const scanIdRef = useRef(0);
+  const securityAnalyticsRef = useRef("");
 
   const normalizedAddress = address.trim();
   const isValidAddress = ADDRESS_PATTERN.test(normalizedAddress);
@@ -1033,6 +1065,28 @@ function App() {
       "--score-color": result.score >= 75 ? "#15b881" : result.score >= 45 ? "#f4a62a" : "#e5484d"
     } as React.CSSProperties;
   }, [result]);
+
+  useEffect(() => {
+    if (!result) return;
+
+    const key = `${result.targetToken.address ?? normalizedAddress}:${result.security.checkedAt}`;
+    if (securityAnalyticsRef.current === key) return;
+    securityAnalyticsRef.current = key;
+
+    const properties = {
+      ...tokenAnalyticsProperties(result.targetToken.address ?? normalizedAddress, result.targetToken.symbol),
+      security_status: result.security.status,
+      critical_count: result.security.criticalCount,
+      warning_count: result.security.warningCount,
+      unavailable_count: result.security.unavailableChecks.length
+    };
+
+    trackEvent("security_section_viewed", properties);
+    if (result.security.criticalCount > 0) trackEvent("critical_warning_displayed", properties);
+    if (result.security.status === "unavailable" || result.security.unavailableChecks.length) {
+      trackEvent("security_check_unavailable", properties);
+    }
+  }, [normalizedAddress, result]);
 
   function resetForInput(nextAddress: string) {
     setAddress(nextAddress);
@@ -1097,6 +1151,8 @@ function App() {
       });
       const payload = await readScanApiResponse(response);
       const baseScanIntelligence = payload?.baseScan ?? emptyBaseScanIntelligence("unavailable", "request-failed");
+      const securityIntelligence =
+        payload?.security ?? emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
 
       if (!response.ok) {
         throw new ScanUiError(scanHttpErrorView(response.status, payload));
@@ -1117,7 +1173,7 @@ function App() {
         return;
       }
 
-      const scanResult = calculateRiskBreakdown(payload.pair, payload.pairs, tokenAddress, baseScanIntelligence);
+      const scanResult = calculateRiskBreakdown(payload.pair, payload.pairs, tokenAddress, baseScanIntelligence, securityIntelligence);
       const historyItem = buildScanHistoryItem(scanResult, tokenAddress);
       const watchlistItem = buildWatchlistItem(scanResult, tokenAddress);
 
@@ -1144,6 +1200,9 @@ function App() {
         verdict: scanResult.verdict,
         base_scan_status: baseScanIntelligence.status,
         base_markets: scanResult.pairs.length,
+        security_status: securityIntelligence.status,
+        security_critical_count: securityIntelligence.criticalCount,
+        security_warning_count: securityIntelligence.warningCount,
         partial_contract_intelligence_failure: hasPartialContractIntelligenceFailure(baseScanIntelligence)
       });
     } catch (scanError) {
@@ -1587,6 +1646,18 @@ function App() {
             )}
           </div>
         </article>
+
+        <article className="panel security-panel">
+          <div className="panel-head">
+            <div>
+              <p className="section-kicker">Security Intelligence</p>
+              <h2>Automated contract signals</h2>
+            </div>
+            <ShieldX size={22} />
+          </div>
+
+          <SecurityIntelligencePanel security={result?.security} loading={isLoading} />
+        </article>
       </section>
 
       <footer className="app-footer">
@@ -1895,6 +1966,74 @@ function WatchlistSection({
         </div>
       )}
     </section>
+  );
+}
+
+function securityStatusLabel(status: SecurityFinding["status"]) {
+  if (status === "pass") return "Pass";
+  if (status === "warning") return "Warning";
+  if (status === "critical") return "Critical";
+  return "Unknown";
+}
+
+function SecurityIntelligencePanel({ security, loading }: { security?: SecurityIntelligence; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="analysis-state intelligence-loading skeleton-state">
+        <Loader2 className="spin" size={22} />
+        <strong>Checking security provider</strong>
+        <span className="skeleton-stack" aria-hidden="true">
+          <span className="skeleton-line skeleton-long" />
+          <span className="skeleton-line skeleton-mid" />
+          <span className="skeleton-line skeleton-short" />
+        </span>
+      </div>
+    );
+  }
+
+  if (!security) {
+    return (
+      <div className="empty-state security-empty">
+        <Search size={22} />
+        <strong>No security data yet</strong>
+        <span>Run a token scan to request server-side security intelligence.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="security-content">
+      <div className="security-summary">
+        <span className={`security-provider ${security.status}`}>
+          {security.status === "available" ? "Provider available" : security.status === "partial" ? "Partial data" : "Security data unavailable"}
+        </span>
+        <span>
+          {security.criticalCount} critical, {security.warningCount} warning, {security.unavailableChecks.length} unknown
+        </span>
+      </div>
+
+      {security.note ? (
+        <div className="intel-note">
+          <Info size={17} />
+          <span>{security.note}</span>
+        </div>
+      ) : null}
+
+      <div className="security-list">
+        {security.checks.map((check) => (
+          <article className={`security-check ${check.status}`} key={check.key}>
+            <div className="security-check-head">
+              <strong>{check.label}</strong>
+              <span>{securityStatusLabel(check.status)}</span>
+            </div>
+            <p>{check.summary}</p>
+            <small>{check.explanation}</small>
+          </article>
+        ))}
+      </div>
+
+      <p className="security-disclaimer">BaseScout provides automated signals, not financial or security guarantees.</p>
+    </div>
   );
 }
 

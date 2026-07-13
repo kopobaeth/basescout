@@ -1057,6 +1057,142 @@ h2 {
   flex-direction: column;
 }
 
+.security-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.security-content {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.security-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.security-provider {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.security-provider.available {
+  color: #087451;
+  background: #eafaf4;
+  border: 1px solid #bcebd8;
+}
+
+.security-provider.partial {
+  color: #875400;
+  background: #fff7e8;
+  border: 1px solid #ffe0a6;
+}
+
+.security-provider.unavailable {
+  color: #9d2529;
+  background: #fff0f0;
+  border: 1px solid #ffd0d2;
+}
+
+.security-list {
+  display: grid;
+  gap: 8px;
+  max-height: 560px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.security-check {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid #e1e8f2;
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+
+.security-check.pass {
+  border-left-color: #15b881;
+}
+
+.security-check.warning {
+  border-left-color: #f4a62a;
+}
+
+.security-check.critical {
+  border-left-color: #e5484d;
+}
+
+.security-check.unknown {
+  border-left-color: #8d9bae;
+}
+
+.security-check-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.security-check-head strong {
+  color: var(--ink);
+}
+
+.security-check-head span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.security-check p,
+.security-check small {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.security-check p {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.security-check small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.security-disclaimer {
+  margin: 0;
+  padding: 10px 11px;
+  color: #536172;
+  background: #f7faff;
+  border: 1px solid #e1e8f2;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.security-empty {
+  margin-top: 18px;
+}
+
 .intel-note {
   display: flex;
   align-items: flex-start;
@@ -1219,6 +1355,12 @@ h2 {
   }
 
   .detail-grid .panel:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1101px) {
+  .detail-grid .security-panel {
     grid-column: 1 / -1;
   }
 }

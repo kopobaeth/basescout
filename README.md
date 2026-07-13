@@ -13,7 +13,9 @@ It checks:
 - Liquidity, 24h volume, 24h price change, market cap or FDV
 - Pair age and 24h transaction count
 - Optional contract verification status, deployer, deployment age, supply, and holder count from BaseScan
+- Optional GoPlus security intelligence for honeypot, taxes, owner controls, trading restrictions, proxy status, ownership, and source availability
 - Server-side Etherscan API access using Base chain ID `8453`
+- Server-side security provider access; security APIs are never called directly from the browser
 - Recent successful scans stored locally in the browser
 - Watchlist tokens stored locally in the browser
 - Vercel Analytics page tracking and PostHog product events when configured
@@ -74,11 +76,24 @@ Optional BaseScan factors:
 - Holder count `100-1,000`: `-6`
 - Missing verification, deployer, age, supply, or holder count lowers confidence and can reduce contract score
 
+Security intelligence factors:
+
+- Confirmed honeypot or cannot-sell finding: critical signal
+- Owner can mint: high-risk signal
+- Blacklist capability: high-risk signal
+- Sell tax above `10%`: high-risk signal
+- Upgradeable proxy: warning signal
+- Trading restrictions, whitelist, pausable transfers, or high transfer/buy taxes: warning signals
+- Verified/open-source contract: positive signal only
+- Security provider outage or missing fields lowers confidence and does not imply lower risk
+
 Verdicts:
 
-- `75+`: Looks tradable
-- `45-74`: Proceed carefully
-- Below `45`: High risk
+- Lower risk
+- Moderate risk
+- High risk
+- Critical risk
+- Insufficient data
 
 Confidence:
 
@@ -99,7 +114,8 @@ Missing data is never treated as automatically safe.
 - BaseScan holder count may require a paid API plan.
 - Holder count, deployer, supply, or creation data may be unavailable even with a key.
 - Risk score is heuristic and should not be treated as a definitive safety rating.
-- The app does not detect honeypots, transfer taxes, ownership controls, proxy upgrade risk, or malicious contract logic beyond available BaseScan metadata.
+- The app does not prove whether contract logic is malicious; it only reports automated provider signals and public metadata.
+- Security intelligence depends on third-party provider coverage and may be incomplete, delayed, or wrong.
 
 ## Run Locally
 
@@ -142,6 +158,18 @@ ETHERSCAN_API_KEY=your_api_key_here
 
 BaseScout uses the unified Etherscan API V2 with Base chain ID `8453`. Keep this variable server-only and do not use a Vite-exposed prefix.
 
+## Configure Security Intelligence
+
+BaseScout requests token security data from the Vercel serverless backend only. The browser never calls the security provider directly.
+
+Set this optional server-only variable when using an authenticated GoPlus setup:
+
+```bash
+GOPLUS_API_KEY=your_goplus_api_key_here
+```
+
+The scan still works if the provider times out, rejects the request, or returns incomplete data. In that case, BaseScout returns partial results and marks security checks as unknown.
+
 ## Configure Analytics
 
 Vercel Analytics is installed through `@vercel/analytics` and rendered once in the React root.
@@ -166,6 +194,9 @@ Tracked events:
 - `watchlist_added`
 - `watchlist_removed`
 - `watchlist_rescan`
+- `security_section_viewed`
+- `critical_warning_displayed`
+- `security_check_unavailable`
 
 Event payloads avoid full token addresses. They include the token symbol when available and a shortened address such as `0x1234...abcd`.
 
@@ -190,6 +221,15 @@ Static hosting:
 - Uploading only `dist` is not enough for v0.4 because `/api/scan` must run on a serverless host.
 
 ## Changelog
+
+### v0.7
+
+- Added server-side GoPlus Token Security API integration for Base
+- Normalized honeypot, tax, mint, blacklist, whitelist, pause, trading restriction, proxy, ownership, owner privilege, and source availability checks
+- Added Security Intelligence UI with Pass, Warning, Critical, and Unknown statuses
+- Updated Contract Risk scoring with critical and warning security findings
+- Added security analytics events
+- Added basic TypeScript tests for security-driven contract risk scoring
 
 ### v0.6
 
@@ -237,4 +277,4 @@ Static hosting:
 
 ## Disclaimer
 
-BaseScout is not financial advice. It is a first-pass scanner for public market and contract metadata. Always DYOR before trading, investing, or interacting with any token contract.
+BaseScout provides automated signals, not financial or security guarantees. It is a first-pass scanner for public market, contract, and third-party security metadata. Always DYOR before trading, investing, or interacting with any token contract.

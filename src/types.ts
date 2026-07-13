@@ -70,6 +70,46 @@ export type RiskScoreBreakdown = {
   contractReasons: ScoreReason[];
 };
 
+export type SecurityCheckStatus = "pass" | "warning" | "critical" | "unknown";
+export type SecurityEvidenceLevel = "confirmed" | "inferred" | "unavailable";
+export type SecurityProviderStatus = "available" | "partial" | "unavailable";
+
+export type SecurityCheckKey =
+  | "honeypot"
+  | "buy_tax"
+  | "sell_tax"
+  | "transfer_tax"
+  | "owner_can_mint"
+  | "blacklist"
+  | "whitelist"
+  | "pausable"
+  | "trading_restrictions"
+  | "proxy"
+  | "ownership_renounced"
+  | "owner_privileges"
+  | "verified_contract";
+
+export type SecurityFinding = {
+  key: SecurityCheckKey;
+  label: string;
+  status: SecurityCheckStatus;
+  summary: string;
+  explanation: string;
+  evidence: SecurityEvidenceLevel;
+  value?: string;
+};
+
+export type SecurityIntelligence = {
+  status: SecurityProviderStatus;
+  provider: "goplus";
+  checkedAt: number;
+  checks: SecurityFinding[];
+  unavailableChecks: SecurityCheckKey[];
+  criticalCount: number;
+  warningCount: number;
+  note?: string;
+};
+
 export type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
 export type VerificationStatus = "verified" | "unverified" | "unknown";
 export type BaseScanUnavailableReason =
@@ -102,6 +142,7 @@ export type ScanResult = {
   pairs: DexPair[];
   targetToken: DexToken;
   baseScan: BaseScanIntelligence;
+  security: SecurityIntelligence;
   score: number;
   verdict: string;
   breakdown: RiskScoreBreakdown;
@@ -121,11 +162,13 @@ export type ScanApiResponse = {
   pair: DexPair | null;
   pairs: DexPair[];
   baseScan: BaseScanIntelligence;
+  security: SecurityIntelligence;
   error?: string;
   errorCode?: ScanErrorCode;
   errors?: {
     dex?: string;
     baseScan?: string;
+    security?: string;
   };
 };
 

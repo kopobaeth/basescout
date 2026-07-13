@@ -11,7 +11,10 @@ type AnalyticsEventName =
   | "market_opened"
   | "watchlist_added"
   | "watchlist_removed"
-  | "watchlist_rescan";
+  | "watchlist_rescan"
+  | "security_section_viewed"
+  | "critical_warning_displayed"
+  | "security_check_unavailable";
 
 type AnalyticsProperties = Record<string, boolean | number | string | undefined>;
 
