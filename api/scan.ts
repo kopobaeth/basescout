@@ -9,7 +9,7 @@ import type {
   ScanApiResponse,
   SecurityIntelligence
 } from "../src/types";
-import { emptySecurityIntelligence, normalizeGoPlusSecurityResponse } from "../src/security";
+import { emptySecurityIntelligence, normalizeGoPlusSecurityResponse } from "./security";
 
 type DexResponse = {
   pairs?: DexPair[] | null;
@@ -73,6 +73,10 @@ function integerFromString(value: unknown) {
 
 function sameAddress(a?: string, b?: string) {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function emptyBaseScanIntelligence(status: BaseScanStatus = "idle", reason?: BaseScanUnavailableReason): BaseScanIntelligence {
@@ -207,7 +211,7 @@ async function fetchJson(url: URL | string, timeoutMs: number, label: string) {
 
     return (await response.json()) as unknown;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError(error)) {
       throw new ScanApiError(`${label} request timed out`);
     }
     throw error;
@@ -245,7 +249,7 @@ async function fetchSecurityJson(tokenAddress: string) {
 
     return (await response.json()) as unknown;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError(error)) {
       throw new ScanApiError("GoPlus request timed out");
     }
     throw error;
@@ -509,9 +513,26 @@ function withCacheHeaders(response: ServerResponse) {
 }
 
 function sendJson(response: ServerResponse, status: number, payload: ScanApiResponse | { error: string; errorCode?: ScanErrorCode }) {
-  withCacheHeaders(response);
-  response.statusCode = status;
-  response.end(JSON.stringify(payload));
+  try {
+    if (!response.headersSent) withCacheHeaders(response);
+    response.statusCode = status;
+    response.end(JSON.stringify(payload));
+  } catch (error) {
+    console.error("[BaseScout] JSON serialization failed", error);
+    if (response.writableEnded) return;
+
+    try {
+      response.statusCode = 500;
+      response.end(
+        JSON.stringify({
+          error: "Unexpected server error. Scan API could not serialize the response.",
+          errorCode: "unexpected_server_error"
+        })
+      );
+    } catch (fallbackError) {
+      console.error("[BaseScout] JSON fallback response failed", fallbackError);
+    }
+  }
 }
 
 function requestUrl(request: IncomingMessage) {
@@ -607,7 +628,7 @@ export default async function handler(request: IncomingMessage, response: Server
       errors: Object.keys(errors).length ? errors : undefined
     });
   } catch (error) {
-    console.error("[BaseScout] Scan API failed");
+    console.error("[BaseScout] Scan API failed", error);
     sendJson(response, 500, {
       error: "Unexpected server error. Scan API could not complete the request.",
       errorCode: "unexpected_server_error"
