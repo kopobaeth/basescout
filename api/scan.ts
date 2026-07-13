@@ -1,15 +1,131 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type {
-  BaseScanIntelligence,
-  BaseScanStatus,
-  BaseScanUnavailableReason,
-  DexPair,
-  DexToken,
-  ScanErrorCode,
-  ScanApiResponse,
-  SecurityIntelligence
-} from "../src/types";
-import { emptySecurityIntelligence, normalizeGoPlusSecurityResponse } from "./security";
+
+type DexToken = {
+  address?: string;
+  name?: string;
+  symbol?: string;
+};
+
+type DexPair = {
+  chainId: string;
+  dexId?: string;
+  url?: string;
+  pairAddress?: string;
+  pairCreatedAt?: number;
+  baseToken?: DexToken;
+  quoteToken?: DexToken;
+  priceUsd?: string;
+  liquidity?: {
+    usd?: number;
+  };
+  volume?: {
+    h24?: number;
+  };
+  priceChange?: {
+    h24?: number;
+  };
+  txns?: {
+    h24?: {
+      buys?: number;
+      sells?: number;
+    };
+  };
+  marketCap?: number;
+  fdv?: number;
+  info?: {
+    imageUrl?: string;
+  };
+};
+
+type SecurityCheckStatus = "pass" | "warning" | "critical" | "unknown";
+type SecurityEvidenceLevel = "confirmed" | "inferred" | "unavailable";
+type SecurityProviderStatus = "available" | "partial" | "unavailable";
+
+type SecurityCheckKey =
+  | "honeypot"
+  | "buy_tax"
+  | "sell_tax"
+  | "transfer_tax"
+  | "owner_can_mint"
+  | "blacklist"
+  | "whitelist"
+  | "pausable"
+  | "trading_restrictions"
+  | "proxy"
+  | "ownership_renounced"
+  | "owner_privileges"
+  | "verified_contract";
+
+type SecurityFinding = {
+  key: SecurityCheckKey;
+  label: string;
+  status: SecurityCheckStatus;
+  summary: string;
+  explanation: string;
+  evidence: SecurityEvidenceLevel;
+  value?: string;
+};
+
+type SecurityIntelligence = {
+  status: SecurityProviderStatus;
+  provider: "goplus";
+  checkedAt: number;
+  checks: SecurityFinding[];
+  unavailableChecks: SecurityCheckKey[];
+  criticalCount: number;
+  warningCount: number;
+  note?: string;
+};
+
+type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
+type VerificationStatus = "verified" | "unverified" | "unknown";
+type BaseScanUnavailableReason =
+  | "missing-key"
+  | "request-failed"
+  | "invalid-key"
+  | "rate-limited"
+  | "endpoint-unavailable"
+  | "plan-restricted"
+  | "no-data";
+
+type BaseScanIntelligence = {
+  status: BaseScanStatus;
+  reason?: BaseScanUnavailableReason;
+  verificationStatus: VerificationStatus;
+  contractName?: string;
+  deployer?: string;
+  creationTxHash?: string;
+  createdAt?: number;
+  tokenSupply?: string;
+  holderCount?: number;
+  holderCountUnavailableReason?: BaseScanUnavailableReason;
+  tokenSupplyUnavailableReason?: BaseScanUnavailableReason;
+  creationUnavailableReason?: BaseScanUnavailableReason;
+  note?: string;
+};
+
+type ScanErrorCode =
+  | "invalid_address"
+  | "no_base_pair"
+  | "api_timeout"
+  | "rate_limit"
+  | "partial_contract_intelligence_failure"
+  | "unexpected_server_error";
+
+type ScanApiResponse = {
+  address: string;
+  pair: DexPair | null;
+  pairs: DexPair[];
+  baseScan: BaseScanIntelligence;
+  security: SecurityIntelligence;
+  error?: string;
+  errorCode?: ScanErrorCode;
+  errors?: {
+    dex?: string;
+    baseScan?: string;
+    security?: string;
+  };
+};
 
 type DexResponse = {
   pairs?: DexPair[] | null;
@@ -77,6 +193,450 @@ function sameAddress(a?: string, b?: string) {
 
 function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
+}
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const DEAD_ADDRESS = "0x000000000000000000000000000000000000dead";
+
+const SECURITY_CHECK_KEYS: SecurityCheckKey[] = [
+  "honeypot",
+  "buy_tax",
+  "sell_tax",
+  "transfer_tax",
+  "owner_can_mint",
+  "blacklist",
+  "whitelist",
+  "pausable",
+  "trading_restrictions",
+  "proxy",
+  "ownership_renounced",
+  "owner_privileges",
+  "verified_contract"
+];
+
+function securityStringValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "1" : "0";
+  return undefined;
+}
+
+function securityFirstValue(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = securityStringValue(record[key]);
+    if (value !== undefined && value !== "") return value;
+  }
+
+  return undefined;
+}
+
+function securityFlagValue(record: Record<string, unknown>, keys: string[]) {
+  const value = securityFirstValue(record, keys)?.trim().toLowerCase();
+  if (value === undefined) return undefined;
+  if (["1", "true", "yes"].includes(value)) return true;
+  if (["0", "false", "no"].includes(value)) return false;
+  return undefined;
+}
+
+function securityTaxPercent(record: Record<string, unknown>, keys: string[]) {
+  const value = securityFirstValue(record, keys);
+  if (value === undefined) return undefined;
+
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return parsed <= 1 ? parsed * 100 : parsed;
+}
+
+function securityPercentText(value: number) {
+  return `${value.toFixed(value < 1 ? 2 : 1).replace(/\.0$/, "")}%`;
+}
+
+function securityOwnerRenounced(record: Record<string, unknown>) {
+  const explicit = securityFlagValue(record, ["owner_renounced", "is_renounced"]);
+  if (explicit !== undefined) return explicit;
+
+  const owner = securityFirstValue(record, ["owner_address"]);
+  if (!owner) return undefined;
+  const normalized = owner.toLowerCase();
+  return normalized === ZERO_ADDRESS || normalized === DEAD_ADDRESS;
+}
+
+function securityFinding(
+  key: SecurityCheckKey,
+  label: string,
+  status: SecurityCheckStatus,
+  summary: string,
+  explanation: string,
+  evidence: SecurityEvidenceLevel,
+  value?: string
+): SecurityFinding {
+  return { key, label, status, summary, explanation, evidence, value };
+}
+
+function unknownSecurityFinding(key: SecurityCheckKey, label: string, summary: string) {
+  return securityFinding(
+    key,
+    label,
+    "unknown",
+    summary,
+    "Security provider did not return this field. Missing security data is treated as insufficient information, not lower risk.",
+    "unavailable"
+  );
+}
+
+function securityLabel(key: SecurityCheckKey) {
+  const labels: Record<SecurityCheckKey, string> = {
+    honeypot: "Honeypot status",
+    buy_tax: "Buy tax",
+    sell_tax: "Sell tax",
+    transfer_tax: "Transfer tax",
+    owner_can_mint: "Owner can mint",
+    blacklist: "Blacklist capability",
+    whitelist: "Whitelist capability",
+    pausable: "Pausable transfers",
+    trading_restrictions: "Trading restrictions",
+    proxy: "Proxy or upgradeable contract",
+    ownership_renounced: "Ownership renounced",
+    owner_privileges: "Owner privileges",
+    verified_contract: "Open-source contract"
+  };
+
+  return labels[key];
+}
+
+function emptySecurityIntelligence(note = "Security data unavailable. Market and contract scanning can continue."): SecurityIntelligence {
+  return {
+    status: "unavailable",
+    provider: "goplus",
+    checkedAt: Date.now(),
+    checks: SECURITY_CHECK_KEYS.map((key) => unknownSecurityFinding(key, securityLabel(key), "Security data unavailable")),
+    unavailableChecks: [...SECURITY_CHECK_KEYS],
+    criticalCount: 0,
+    warningCount: 0,
+    note
+  };
+}
+
+function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): SecurityIntelligence {
+  if (!isRecord(value) || !isRecord(value.result)) {
+    return emptySecurityIntelligence("Security provider returned an invalid response.");
+  }
+
+  const tokenRecord = Object.entries(value.result).find(
+    ([address]) => address.toLowerCase() === tokenAddress.toLowerCase()
+  )?.[1];
+  if (!isRecord(tokenRecord)) {
+    return emptySecurityIntelligence("Security provider did not return this token.");
+  }
+
+  const checks: SecurityFinding[] = [];
+  const honeypot = securityFlagValue(tokenRecord, ["is_honeypot", "honeypot"]);
+  const cannotSell = securityFlagValue(tokenRecord, ["cannot_sell_all", "cannot_sell"]);
+  const buyTax = securityTaxPercent(tokenRecord, ["buy_tax"]);
+  const sellTax = securityTaxPercent(tokenRecord, ["sell_tax"]);
+  const transferTax = securityTaxPercent(tokenRecord, ["transfer_tax"]);
+  const mintable = securityFlagValue(tokenRecord, ["is_mintable", "mintable", "owner_can_mint"]);
+  const blacklist = securityFlagValue(tokenRecord, ["blacklist_function", "is_blacklisted", "blacklist"]);
+  const whitelist = securityFlagValue(tokenRecord, ["whitelist_function", "is_whitelisted", "whitelist"]);
+  const pausable = securityFlagValue(tokenRecord, ["transfer_pausable", "pausable"]);
+  const tradingRestriction = securityFlagValue(tokenRecord, [
+    "trading_cooldown",
+    "personal_slippage_modifiable",
+    "slippage_modifiable",
+    "anti_whale_modifiable"
+  ]);
+  const proxy = securityFlagValue(tokenRecord, ["is_proxy", "proxy"]);
+  const renounced = securityOwnerRenounced(tokenRecord);
+  const verified = securityFlagValue(tokenRecord, ["is_open_source", "open_source", "verified_contract"]);
+  const hiddenOwner = securityFlagValue(tokenRecord, ["hidden_owner"]);
+  const takeBackOwnership = securityFlagValue(tokenRecord, ["can_take_back_ownership"]);
+  const ownerModifiesBalance = securityFlagValue(tokenRecord, ["owner_change_balance"]);
+  const ownerPrivileged = [hiddenOwner, takeBackOwnership, ownerModifiesBalance].some(Boolean);
+
+  checks.push(
+    honeypot === undefined
+      ? unknownSecurityFinding("honeypot", "Honeypot status", "Honeypot status unknown")
+      : honeypot || cannotSell
+        ? securityFinding(
+            "honeypot",
+            "Honeypot status",
+            "critical",
+            cannotSell ? "Cannot sell detected" : "Honeypot detected",
+            "Provider reports that selling may be blocked. This matters because holders may be unable to exit a position. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+        : securityFinding(
+            "honeypot",
+            "Honeypot status",
+            "pass",
+            "No honeypot detected",
+            "Provider did not flag honeypot behavior. This lowers this specific risk signal only; it is not a guarantee of safety. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+  );
+
+  checks.push(
+    buyTax === undefined
+      ? unknownSecurityFinding("buy_tax", "Buy tax", "Buy tax unknown")
+      : securityFinding(
+          "buy_tax",
+          "Buy tax",
+          buyTax > 10 ? "warning" : "pass",
+          `Buy tax: ${securityPercentText(buyTax)}`,
+          buyTax > 10
+            ? "High buy tax can make entries expensive and can be changed in some contracts. Evidence: confirmed by provider response."
+            : "Buy tax is not above the 10% high-tax threshold. Evidence: confirmed by provider response.",
+          "confirmed",
+          securityPercentText(buyTax)
+        )
+  );
+
+  checks.push(
+    sellTax === undefined
+      ? unknownSecurityFinding("sell_tax", "Sell tax", "Sell tax unknown")
+      : securityFinding(
+          "sell_tax",
+          "Sell tax",
+          sellTax >= 100 ? "critical" : sellTax > 10 ? "critical" : "pass",
+          `Sell tax: ${securityPercentText(sellTax)}`,
+          sellTax >= 100
+            ? "A 100% sell tax can make selling economically impossible. Evidence: confirmed by provider response."
+            : sellTax > 10
+              ? "Sell tax above 10% materially reduces exits and can indicate hostile token mechanics. Evidence: confirmed by provider response."
+              : "Sell tax is not above the 10% high-tax threshold. Evidence: confirmed by provider response.",
+          "confirmed",
+          securityPercentText(sellTax)
+        )
+  );
+
+  checks.push(
+    transferTax === undefined
+      ? unknownSecurityFinding("transfer_tax", "Transfer tax", "Transfer tax unknown")
+      : securityFinding(
+          "transfer_tax",
+          "Transfer tax",
+          transferTax > 10 ? "warning" : "pass",
+          `Transfer tax: ${securityPercentText(transferTax)}`,
+          transferTax > 10
+            ? "High transfer tax can penalize normal wallet movement. Evidence: confirmed by provider response."
+            : "Transfer tax is not above the 10% high-tax threshold. Evidence: confirmed by provider response.",
+          "confirmed",
+          securityPercentText(transferTax)
+        )
+  );
+
+  checks.push(
+    mintable === undefined
+      ? unknownSecurityFinding("owner_can_mint", "Owner can mint", "Mint capability unknown")
+      : mintable
+        ? securityFinding(
+            "owner_can_mint",
+            "Owner can mint",
+            "critical",
+            "Owner can mint",
+            "Mint authority can inflate supply and dilute holders. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+        : securityFinding(
+            "owner_can_mint",
+            "Owner can mint",
+            "pass",
+            "No owner mint capability detected",
+            "Provider did not flag mint authority. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+  );
+
+  checks.push(
+    blacklist === undefined
+      ? unknownSecurityFinding("blacklist", "Blacklist capability", "Blacklist capability unknown")
+      : blacklist
+        ? securityFinding(
+            "blacklist",
+            "Blacklist capability",
+            "critical",
+            "Blacklist capability enabled",
+            "Blacklist controls can block selected wallets from transferring or selling. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+        : securityFinding(
+            "blacklist",
+            "Blacklist capability",
+            "pass",
+            "No blacklist capability detected",
+            "Provider did not flag blacklist controls. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+  );
+
+  checks.push(
+    whitelist === undefined
+      ? unknownSecurityFinding("whitelist", "Whitelist capability", "Whitelist capability unknown")
+      : whitelist
+        ? securityFinding(
+            "whitelist",
+            "Whitelist capability",
+            "warning",
+            "Whitelist capability enabled",
+            "Whitelist controls can restrict who may trade or transfer. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+        : securityFinding(
+            "whitelist",
+            "Whitelist capability",
+            "pass",
+            "No whitelist capability detected",
+            "Provider did not flag whitelist controls. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+  );
+
+  checks.push(
+    pausable === undefined
+      ? unknownSecurityFinding("pausable", "Pausable transfers", "Pausable transfer status unknown")
+      : pausable
+        ? securityFinding(
+            "pausable",
+            "Pausable transfers",
+            "warning",
+            "Pausable transfers enabled",
+            "Pausable transfers can stop movement during owner-controlled states. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+        : securityFinding(
+            "pausable",
+            "Pausable transfers",
+            "pass",
+            "No pausable transfer control detected",
+            "Provider did not flag pausable transfers. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+  );
+
+  checks.push(
+    tradingRestriction === undefined
+      ? unknownSecurityFinding("trading_restrictions", "Trading restrictions", "Trading restrictions unknown")
+      : tradingRestriction
+        ? securityFinding(
+            "trading_restrictions",
+            "Trading restrictions",
+            "warning",
+            "Trading restrictions detected",
+            "Trading restrictions can limit exits, change slippage rules, or impose wallet-level limits. Evidence: inferred from provider restriction fields.",
+            "inferred"
+          )
+        : securityFinding(
+            "trading_restrictions",
+            "Trading restrictions",
+            "pass",
+            "No trading restrictions detected",
+            "Provider did not flag cooldown, slippage, or anti-whale restrictions. Evidence: inferred from provider restriction fields.",
+            "inferred"
+          )
+  );
+
+  checks.push(
+    proxy === undefined
+      ? unknownSecurityFinding("proxy", "Proxy or upgradeable contract", "Proxy status unknown")
+      : proxy
+        ? securityFinding(
+            "proxy",
+            "Proxy or upgradeable contract",
+            "warning",
+            "Upgradeable proxy",
+            "Upgradeable contracts can change behavior after this scan. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+        : securityFinding(
+            "proxy",
+            "Proxy or upgradeable contract",
+            "pass",
+            "No proxy detected",
+            "Provider did not flag proxy behavior. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+  );
+
+  checks.push(
+    renounced === undefined
+      ? unknownSecurityFinding("ownership_renounced", "Ownership renounced", "Ownership status unknown")
+      : renounced
+        ? securityFinding(
+            "ownership_renounced",
+            "Ownership renounced",
+            "pass",
+            "Ownership renounced",
+            "Renounced ownership can reduce direct owner control, though other privileged roles may still exist. Evidence: inferred from owner address or provider flag.",
+            "inferred"
+          )
+        : securityFinding(
+            "ownership_renounced",
+            "Ownership renounced",
+            "warning",
+            "Ownership not renounced",
+            "Active ownership can preserve administrative control over token behavior. Evidence: inferred from owner address or provider flag.",
+            "inferred"
+          )
+  );
+
+  checks.push(
+    ownerPrivileged
+      ? securityFinding(
+          "owner_privileges",
+          "Owner privileges",
+          "critical",
+          "Owner privileges detected",
+          "Owner-only controls can alter balances, regain ownership, or hide control paths. Evidence: inferred from provider owner privilege fields.",
+          "inferred"
+        )
+      : [hiddenOwner, takeBackOwnership, ownerModifiesBalance].every((value) => value === false)
+        ? securityFinding(
+            "owner_privileges",
+            "Owner privileges",
+            "pass",
+            "No high-risk owner privileges detected",
+            "Provider did not flag hidden owner, ownership recovery, or owner balance changes. Evidence: inferred from provider owner privilege fields.",
+            "inferred"
+          )
+        : unknownSecurityFinding("owner_privileges", "Owner privileges", "Owner privilege status unknown")
+  );
+
+  checks.push(
+    verified === undefined
+      ? unknownSecurityFinding("verified_contract", "Open-source contract", "Open-source status unknown")
+      : verified
+        ? securityFinding(
+            "verified_contract",
+            "Open-source contract",
+            "pass",
+            "Contract verified/open-source",
+            "Verified source improves reviewability. This is a positive signal only, not proof of safety. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+        : securityFinding(
+            "verified_contract",
+            "Open-source contract",
+            "warning",
+            "Contract source not verified",
+            "Unverified source limits independent review of token behavior. Evidence: confirmed by provider response.",
+            "confirmed"
+          )
+  );
+
+  const unavailableChecks = checks.filter((check) => check.status === "unknown").map((check) => check.key);
+  const criticalCount = checks.filter((check) => check.status === "critical").length;
+  const warningCount = checks.filter((check) => check.status === "warning").length;
+
+  return {
+    status: unavailableChecks.length ? "partial" : "available",
+    provider: "goplus",
+    checkedAt: Date.now(),
+    checks,
+    unavailableChecks,
+    criticalCount,
+    warningCount,
+    note: unavailableChecks.length ? "Some security checks were unavailable. Missing data is not treated as lower risk." : undefined
+  };
 }
 
 function emptyBaseScanIntelligence(status: BaseScanStatus = "idle", reason?: BaseScanUnavailableReason): BaseScanIntelligence {
