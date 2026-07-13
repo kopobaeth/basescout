@@ -9,14 +9,16 @@ BaseScout combines public DEX Screener market data with optional BaseScan contra
 It checks:
 
 - Highest-liquidity Base pair for the token
+- Up to five Base markets sorted by USD liquidity
 - Liquidity, 24h volume, 24h price change, market cap or FDV
 - Pair age and 24h transaction count
 - Optional contract verification status, deployer, deployment age, supply, and holder count from BaseScan
 - Server-side Etherscan API access using Base chain ID `8453`
 - Recent successful scans stored locally in the browser
+- Watchlist tokens stored locally in the browser
 - Vercel Analytics page tracking and PostHog product events when configured
 
-The result is a first-pass risk score and a list of concrete findings.
+The result is a first-pass risk score, market list, watchlist controls, and transparent scoring reasons.
 
 ## Why It Exists
 
@@ -35,33 +37,42 @@ Built-in examples:
 
 ## How Risk Score Works
 
-The score starts at `72` and is clamped between `4` and `96`.
+BaseScout shows four score blocks:
+
+- Overall Risk Score
+- Market Risk
+- Contract Risk
+- Data Confidence
+
+Market and contract scores start at `72` and are clamped between `4` and `96`. The overall score is weighted from market risk, contract risk, and data confidence.
 
 DEX Screener factors:
 
-- Liquidity above `$500k`: `+5`
-- Liquidity `$50k-$500k`: `-9`
+- Liquidity above `$500k`: positive strong-liquidity signal
+- Liquidity `$50k-$500k`: caution signal
 - Liquidity below `$50k`: `-18`
-- Pair age above `30 days`: `+5`
-- Pair age `3-30 days`: `-9`
+- Pair age above `30 days`: positive established-pair signal
+- Pair age `3-30 days`: caution signal
 - Pair age below `3 days`: `-18`
-- 24h transactions above `1,000`: `+5`
-- 24h transactions `100-999`: `-9`
-- 24h transactions below `100`: `-18`
+- 24h transactions above `1,000`: positive activity signal
+- 24h transactions `100-999`: caution signal
+- 24h transactions below `100`: danger signal
 - Volume/liquidity above `10x`: `-9`
-- Market cap/liquidity above `80x`: `-18`
-- Market cap/liquidity above `25x`: `-9`
-- Absolute 24h price change above `80%`: `-18`
-- Absolute 24h price change above `30%`: `-9`
+- Market cap or FDV/liquidity above `80x`: danger signal
+- Market cap or FDV/liquidity above `25x`: caution signal
+- Absolute 24h price change above `80%`: danger volatility signal
+- Absolute 24h price change above `30%`: caution volatility signal
+- Missing liquidity, age, transaction, volume, valuation, or volatility data lowers confidence and can reduce market score
 
 Optional BaseScan factors:
 
-- Verified contract: `+5`
-- Unverified contract: `-18`
-- Contract age below `3 days`: `-18`
-- Contract age `3-30 days`: `-9`
+- Verified contract: positive contract signal
+- Unverified contract: danger signal
+- Contract age below `3 days`: danger signal
+- Contract age `3-30 days`: caution signal
 - Holder count below `100`: `-12`
 - Holder count `100-1,000`: `-6`
+- Missing verification, deployer, age, supply, or holder count lowers confidence and can reduce contract score
 
 Verdicts:
 
@@ -69,11 +80,20 @@ Verdicts:
 - `45-74`: Proceed carefully
 - Below `45`: High risk
 
+Confidence:
+
+- High: most checks completed
+- Medium: meaningful data is present but some checks are missing
+- Low: many checks are unavailable
+
+Missing data is never treated as automatically safe.
+
 ## Current Limitations
 
 - MVP serverless API; there is no database, queue, or long-lived cache.
 - The Etherscan API key is server-only and should not use a `VITE_` prefix.
 - Recent scans are browser-local and clear when localStorage is cleared.
+- Watchlist entries are browser-local and clear when localStorage is cleared.
 - PostHog event payloads send token symbols and shortened addresses only.
 - DEX Screener indexing can lag new pairs.
 - BaseScan holder count may require a paid API plan.
@@ -142,6 +162,10 @@ Tracked events:
 - `copy_pair_address`
 - `open_basescan`
 - `open_dexscreener`
+- `market_opened`
+- `watchlist_added`
+- `watchlist_removed`
+- `watchlist_rescan`
 
 Event payloads avoid full token addresses. They include the token symbol when available and a shortened address such as `0x1234...abcd`.
 
@@ -166,6 +190,15 @@ Static hosting:
 - Uploading only `dist` is not enough for v0.4 because `/api/scan` must run on a serverless host.
 
 ## Changelog
+
+### v0.6
+
+- `/api/scan` returns all normalized Base pairs in `pairs` while preserving `pair` as the highest-liquidity primary pair
+- Added Markets section with primary, low-liquidity, and new-pair markers
+- Added local watchlist with add, remove, and rescan actions
+- Replaced the single unexplained score with Overall Risk Score, Market Risk, Contract Risk, and Data Confidence
+- Added completed and unavailable check counts
+- Added analytics events for market opens and watchlist actions
 
 ### v0.5
 

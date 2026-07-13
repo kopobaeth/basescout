@@ -31,6 +31,12 @@ import {
   readScanHistory,
   upsertScanHistoryItem
 } from "./scanHistory";
+import {
+  buildWatchlistItem,
+  readWatchlist,
+  removeWatchlistItem,
+  upsertWatchlistItem
+} from "./watchlist";
 import "./styles.css";
 import type {
   BaseScanIntelligence,
@@ -42,7 +48,9 @@ import type {
   ScanApiResponse,
   ScanErrorCode,
   ScanHistoryItem,
-  ScanResult
+  ScanResult,
+  ScoreReason,
+  WatchlistItem
 } from "./types";
 
 declare global {
@@ -53,7 +61,7 @@ declare global {
 
 type ScanStatus = "idle" | "loading" | "success" | "error";
 type CopyState = "idle" | "copied" | "failed";
-type ScanSource = "manual" | "example" | "history";
+type ScanSource = "manual" | "example" | "history" | "watchlist";
 
 type ScanContext = {
   source: ScanSource;
@@ -167,6 +175,11 @@ function contractIntelligenceNotice(baseScan: BaseScanIntelligence) {
 function parseScanApiResponse(value: unknown): ScanApiResponse | undefined {
   if (!isRecord(value)) return undefined;
   const pair = isRecord(value.pair) ? (value.pair as DexPair) : null;
+  const pairs = Array.isArray(value.pairs)
+    ? value.pairs.filter(isRecord).map((pairValue) => pairValue as DexPair)
+    : pair
+      ? [pair]
+      : [];
   const baseScan = isRecord(value.baseScan)
     ? (value.baseScan as BaseScanIntelligence)
     : emptyBaseScanIntelligence("unavailable", "request-failed");
@@ -174,6 +187,7 @@ function parseScanApiResponse(value: unknown): ScanApiResponse | undefined {
   return {
     address: stringValue(value.address) ?? "",
     pair,
+    pairs,
     baseScan,
     error: stringValue(value.error),
     errorCode: scanErrorCodeValue(value.errorCode),
@@ -693,10 +707,251 @@ function calculateRisk(pair: DexPair, tokenAddress: string, baseScan: BaseScanIn
 
   return {
     pair,
+    pairs: [pair],
     targetToken: getTargetToken(pair, tokenAddress),
     baseScan,
     score: finalScore,
     verdict,
+    breakdown: {
+      overall: finalScore,
+      market: finalScore,
+      contract: finalScore,
+      confidence: {
+        score: 0,
+        label: "Low",
+        completedChecks: [],
+        unavailableChecks: ["Legacy scorer"],
+        reasons: []
+      },
+      marketReasons: findings,
+      contractReasons: []
+    },
+    findings
+  };
+}
+
+function addReason(reasons: ScoreReason[], title: string, detail: string, delta: number, tone: FindingTone) {
+  reasons.push({ title, detail, delta, tone });
+  return delta;
+}
+
+function confidenceLabel(score: number) {
+  if (score >= 75) return "High";
+  if (score >= 45) return "Medium";
+  return "Low";
+}
+
+function calculateRiskBreakdown(pair: DexPair, pairs: DexPair[], tokenAddress: string, baseScan: BaseScanIntelligence): ScanResult {
+  let marketScore = 72;
+  let contractScore = 72;
+  const marketReasons: ScoreReason[] = [];
+  const contractReasons: ScoreReason[] = [];
+  const confidenceReasons: ScoreReason[] = [];
+  const completedChecks: string[] = [];
+  const unavailableChecks: string[] = [];
+  const liquidity = pair.liquidity?.usd;
+  const days = ageInDays(pair.pairCreatedAt);
+  const buys = pair.txns?.h24?.buys;
+  const sells = pair.txns?.h24?.sells;
+  const hasTxnData = Number.isFinite(buys) || Number.isFinite(sells);
+  const txns = (buys ?? 0) + (sells ?? 0);
+  const volume = pair.volume?.h24;
+  const marketValue = pair.marketCap ?? pair.fdv;
+  const priceChange = pair.priceChange?.h24;
+  const complete = (check: string) => completedChecks.push(check);
+  const unavailable = (check: string) => unavailableChecks.push(check);
+
+  if (pairs.length) complete("Base market discovery");
+  else unavailable("Base market discovery");
+
+  if (Number.isFinite(liquidity)) {
+    complete("Liquidity");
+    if ((liquidity as number) >= 500_000) {
+      marketScore += addReason(marketReasons, "Strong liquidity", `${currency(liquidity)} is above the $500k strong-liquidity threshold.`, 8, "positive");
+    } else if ((liquidity as number) >= 50_000) {
+      marketScore += addReason(marketReasons, "Moderate liquidity", `${currency(liquidity)} sits inside the $50k-$500k watch zone where position size matters.`, -6, "warning");
+    } else {
+      marketScore += addReason(marketReasons, "Low liquidity", `${currency(liquidity)} is below the $50k low-liquidity threshold and can move sharply on small orders.`, -18, "danger");
+    }
+  } else {
+    unavailable("Liquidity");
+    marketScore += addReason(marketReasons, "Liquidity unavailable", "DEX Screener did not return USD liquidity. Missing liquidity is treated as lower confidence, not safety.", -8, "warning");
+  }
+
+  if (Number.isFinite(days)) {
+    complete("Pair age");
+    if ((days as number) >= 30) {
+      marketScore += addReason(marketReasons, "Established pair", `Pair age is ${thresholdAgeText(days as number)}, above the 30-day maturity threshold.`, 6, "positive");
+    } else if ((days as number) >= 3) {
+      marketScore += addReason(marketReasons, "Young pair", `Pair age is ${thresholdAgeText(days as number)}, inside the 3-30 day watch zone.`, -8, "warning");
+    } else {
+      marketScore += addReason(marketReasons, "New pair", `Pair age is ${thresholdAgeText(days as number)}, below the 3-day new-pair threshold.`, -18, "danger");
+    }
+  } else {
+    unavailable("Pair age");
+    marketScore += addReason(marketReasons, "Pair age unavailable", "DEX Screener did not return a pair creation timestamp.", -6, "warning");
+  }
+
+  if (hasTxnData) {
+    complete("24h transactions");
+    if (txns >= 1_000) {
+      marketScore += addReason(marketReasons, "Active trading", `${numberText(txns)} transactions in 24h (${numberText(buys ?? 0)} buys, ${numberText(sells ?? 0)} sells), above the 1,000 activity threshold.`, 6, "positive");
+    } else if (txns >= 100) {
+      marketScore += addReason(marketReasons, "Limited trading", `${numberText(txns)} transactions in 24h (${numberText(buys ?? 0)} buys, ${numberText(sells ?? 0)} sells), inside the 100-999 activity watch zone.`, -8, "warning");
+    } else {
+      marketScore += addReason(marketReasons, "Low transaction count", `${numberText(txns)} transactions in 24h (${numberText(buys ?? 0)} buys, ${numberText(sells ?? 0)} sells), below the 100 transaction threshold.`, -16, "danger");
+    }
+  } else {
+    unavailable("24h transactions");
+    marketScore += addReason(marketReasons, "Transaction data unavailable", "DEX Screener did not return 24h transaction counts.", -6, "warning");
+  }
+
+  if (Number.isFinite(volume)) {
+    complete("24h volume");
+  } else {
+    unavailable("24h volume");
+    marketScore += addReason(marketReasons, "Volume unavailable", "DEX Screener did not return 24h volume, so turnover quality cannot be confirmed.", -4, "warning");
+  }
+
+  if (Number.isFinite(liquidity) && Number.isFinite(volume) && (liquidity as number) > 0) {
+    const turnoverRatio = (volume as number) / (liquidity as number);
+    if (turnoverRatio > 10) {
+      marketScore += addReason(marketReasons, "Turnover spike", `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, above the 10x churn threshold.`, -9, "warning");
+    } else {
+      addReason(marketReasons, "Turnover contained", `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, below the 10x churn threshold.`, 0, "neutral");
+    }
+  }
+
+  if (Number.isFinite(marketValue)) {
+    complete(pair.marketCap ? "Market cap" : "FDV");
+    if (Number.isFinite(liquidity) && (liquidity as number) > 0) {
+      const capRatio = (marketValue as number) / (liquidity as number);
+      if (capRatio > 80) {
+        marketScore += addReason(marketReasons, "Extreme valuation gap", `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 80x extreme threshold.`, -16, "danger");
+      } else if (capRatio > 25) {
+        marketScore += addReason(marketReasons, "Elevated valuation gap", `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 25x watch threshold.`, -8, "warning");
+      } else {
+        addReason(marketReasons, "Valuation supported", `Market value/liquidity is ${capRatio.toFixed(1)}x, below the 25x watch threshold.`, 0, "neutral");
+      }
+    }
+  } else {
+    unavailable("Market cap or FDV");
+    marketScore += addReason(marketReasons, "Valuation data unavailable", "Market cap and FDV were missing, so valuation/liquidity could not be scored.", -4, "warning");
+  }
+
+  if (Number.isFinite(priceChange)) {
+    complete("24h price change");
+    const absoluteMove = Math.abs(priceChange as number);
+    if (absoluteMove > 80) {
+      marketScore += addReason(marketReasons, "Extreme volatility", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 80% extreme-volatility threshold.`, -16, "danger");
+    } else if (absoluteMove > 30) {
+      marketScore += addReason(marketReasons, "High volatility", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 30% volatility watch threshold.`, -8, "warning");
+    } else {
+      addReason(marketReasons, "Price move contained", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, below the 30% volatility watch threshold.`, 0, "neutral");
+    }
+  } else {
+    unavailable("24h price change");
+    marketScore += addReason(marketReasons, "Volatility unavailable", "DEX Screener did not return 24h price change.", -4, "warning");
+  }
+
+  if (baseScan.status === "unavailable") {
+    ["Contract verification", "Contract age", "Deployer", "Token supply", "Holder count"].forEach(unavailable);
+    contractScore += addReason(contractReasons, "Incomplete contract data", baseScan.note ?? "BaseScan contract intelligence is unavailable. Missing contract data is not treated as safe.", -10, "warning");
+  } else if (baseScan.status === "available") {
+    if (baseScan.verificationStatus === "verified") {
+      complete("Contract verification");
+      contractScore += addReason(contractReasons, "Verified contract", `${baseScan.contractName ? `${baseScan.contractName} ` : "Contract "}source is verified on BaseScan.`, 8, "positive");
+    } else if (baseScan.verificationStatus === "unverified") {
+      complete("Contract verification");
+      contractScore += addReason(contractReasons, "Unverified contract", "BaseScan does not show verified source code for this contract.", -18, "danger");
+    } else {
+      unavailable("Contract verification");
+      contractScore += addReason(contractReasons, "Verification unknown", "BaseScan did not return a conclusive source verification result.", -8, "warning");
+    }
+
+    const contractAgeDays = ageInDays(baseScan.createdAt);
+    if (Number.isFinite(contractAgeDays)) {
+      complete("Contract age");
+      if ((contractAgeDays as number) < 3) {
+        contractScore += addReason(contractReasons, "Fresh deployment", `Contract age is ${thresholdAgeText(contractAgeDays as number)}, below the 3-day deployment threshold.`, -18, "danger");
+      } else if ((contractAgeDays as number) < 30) {
+        contractScore += addReason(contractReasons, "Recent deployment", `Contract age is ${thresholdAgeText(contractAgeDays as number)}, inside the 3-30 day watch zone.`, -8, "warning");
+      } else {
+        contractScore += addReason(contractReasons, "Established deployment", `Contract age is ${thresholdAgeText(contractAgeDays as number)}, above the 30-day watch zone.`, 4, "positive");
+      }
+    } else {
+      unavailable("Contract age");
+      contractScore += addReason(contractReasons, "Contract age unavailable", "BaseScan did not return deployment age.", -6, "warning");
+    }
+
+    if (baseScan.deployer) {
+      complete("Deployer");
+      addReason(contractReasons, "Deployer found", `BaseScan reports deployer ${baseScan.deployer}.`, 0, "neutral");
+    } else {
+      unavailable("Deployer");
+      contractScore += addReason(contractReasons, "Deployer unavailable", "BaseScan did not return a deployer address.", -3, "warning");
+    }
+
+    if (Number.isFinite(baseScan.holderCount)) {
+      complete("Holder count");
+      if ((baseScan.holderCount as number) < 100) {
+        contractScore += addReason(contractReasons, "Holder count very low", `${numberText(baseScan.holderCount)} holders is below the 100-holder danger threshold.`, -12, "danger");
+      } else if ((baseScan.holderCount as number) < 1_000) {
+        contractScore += addReason(contractReasons, "Holder count low", `${numberText(baseScan.holderCount)} holders is inside the 100-1,000 holder watch zone.`, -6, "warning");
+      } else {
+        addReason(contractReasons, "Holder count established", `${numberText(baseScan.holderCount)} holders is above the 1,000-holder watch zone.`, 0, "neutral");
+      }
+    } else {
+      unavailable("Holder count");
+      contractScore += addReason(contractReasons, "Holder count unavailable", "BaseScan did not return holder count. Missing holder distribution is not treated as safe.", -5, "warning");
+    }
+
+    if (baseScan.tokenSupply) {
+      complete("Token supply");
+      addReason(contractReasons, "Supply returned", "BaseScan returned token supply.", 0, "neutral");
+    } else {
+      unavailable("Token supply");
+      contractScore += addReason(contractReasons, "Supply unavailable", "BaseScan did not return token supply.", -3, "warning");
+    }
+  }
+
+  const clampedMarketScore = clampScore(marketScore);
+  const clampedContractScore = clampScore(contractScore);
+  const totalChecks = completedChecks.length + unavailableChecks.length;
+  const confidenceScore = Math.round(totalChecks ? (completedChecks.length / totalChecks) * 96 : 0);
+
+  addReason(confidenceReasons, "Completed checks", `${completedChecks.length} of ${totalChecks} checks completed.`, completedChecks.length, "positive");
+  if (unavailableChecks.length) {
+    addReason(confidenceReasons, "Unavailable checks", unavailableChecks.join(", "), -unavailableChecks.length, unavailableChecks.length >= 4 ? "danger" : "warning");
+  } else {
+    addReason(confidenceReasons, "No unavailable checks", "All configured checks returned usable data.", 0, "neutral");
+  }
+
+  const overallScore = clampScore(Math.round(clampedMarketScore * 0.55 + clampedContractScore * 0.35 + confidenceScore * 0.1));
+  const verdict = overallScore >= 75 ? "Looks tradable" : overallScore >= 45 ? "Proceed carefully" : "High risk";
+  const findings: Finding[] = [...marketReasons, ...contractReasons, ...confidenceReasons];
+
+  return {
+    pair,
+    pairs,
+    targetToken: getTargetToken(pair, tokenAddress),
+    baseScan,
+    score: overallScore,
+    verdict,
+    breakdown: {
+      overall: overallScore,
+      market: clampedMarketScore,
+      contract: clampedContractScore,
+      confidence: {
+        score: confidenceScore,
+        label: confidenceLabel(confidenceScore),
+        completedChecks,
+        unavailableChecks,
+        reasons: confidenceReasons
+      },
+      marketReasons,
+      contractReasons
+    },
     findings
   };
 }
@@ -743,6 +998,7 @@ function App() {
   const [baseScan, setBaseScan] = useState<BaseScanIntelligence>(() => emptyBaseScanIntelligence());
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>(() => readScanHistory());
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => readWatchlist());
   const activeRequestRef = useRef<AbortController | null>(null);
   const scanIdRef = useRef(0);
 
@@ -750,9 +1006,12 @@ function App() {
   const isValidAddress = ADDRESS_PATTERN.test(normalizedAddress);
   const isLoading = status === "loading";
   const selectedPair = result?.pair;
+  const selectedPairs = result?.pairs ?? [];
   const selectedToken = result?.targetToken;
+  const selectedTokenAddress = selectedToken?.address ?? (isValidAddress ? normalizedAddress : undefined);
+  const selectedWatchlistItem = watchlist.find((item) => sameAddress(item.address, selectedTokenAddress));
   const activeBaseScan = result?.baseScan ?? baseScan;
-  const baseScanTokenAddress = selectedToken?.address ?? (isValidAddress ? normalizedAddress : undefined);
+  const baseScanTokenAddress = selectedTokenAddress;
   const baseScanUrl = baseScanUrlFor(baseScanTokenAddress);
   const isBaseScanLoading = activeBaseScan.status === "loading";
   const intelligenceNotice = isBaseScanLoading ? undefined : contractIntelligenceNotice(activeBaseScan);
@@ -858,20 +1117,33 @@ function App() {
         return;
       }
 
-      const scanResult = calculateRisk(payload.pair, tokenAddress, baseScanIntelligence);
+      const scanResult = calculateRiskBreakdown(payload.pair, payload.pairs, tokenAddress, baseScanIntelligence);
       const historyItem = buildScanHistoryItem(scanResult, tokenAddress);
+      const watchlistItem = buildWatchlistItem(scanResult, tokenAddress);
 
       setResult(scanResult);
       setStatus("success");
       if (historyItem) {
         setScanHistory((currentHistory) => upsertScanHistoryItem(currentHistory, historyItem));
       }
+      if (watchlistItem) {
+        setWatchlist((currentWatchlist) =>
+          currentWatchlist.some((item) => sameAddress(item.address, watchlistItem.address))
+            ? upsertWatchlistItem(currentWatchlist, watchlistItem)
+            : currentWatchlist
+        );
+      }
       trackEvent("scan_success", {
         source: context.source,
         ...tokenAnalyticsProperties(historyItem?.address ?? scanResult.targetToken.address ?? tokenAddress, scanResult.targetToken.symbol ?? context.symbol),
         risk_score: scanResult.score,
+        market_risk: scanResult.breakdown.market,
+        contract_risk: scanResult.breakdown.contract,
+        data_confidence: scanResult.breakdown.confidence.score,
+        confidence_label: scanResult.breakdown.confidence.label,
         verdict: scanResult.verdict,
         base_scan_status: baseScanIntelligence.status,
+        base_markets: scanResult.pairs.length,
         partial_contract_intelligence_failure: hasPartialContractIntelligenceFailure(baseScanIntelligence)
       });
     } catch (scanError) {
@@ -903,9 +1175,50 @@ function App() {
     void scanToken(item.address, { source: "history", symbol: item.symbol });
   }
 
+  function rescanWatchlistItem(item: WatchlistItem) {
+    if (isLoading) return;
+    trackEvent("watchlist_rescan", {
+      ...tokenAnalyticsProperties(item.address, item.symbol),
+      last_risk_score: item.lastRiskScore
+    });
+    void scanToken(item.address, { source: "watchlist", symbol: item.symbol });
+  }
+
   function clearHistory() {
     clearScanHistory();
     setScanHistory([]);
+  }
+
+  function addCurrentToWatchlist() {
+    if (!result) return;
+    const item = buildWatchlistItem(result, selectedTokenAddress ?? normalizedAddress);
+    if (!item) return;
+
+    setWatchlist((currentWatchlist) => upsertWatchlistItem(currentWatchlist, item));
+    trackEvent("watchlist_added", {
+      ...tokenAnalyticsProperties(item.address, item.symbol),
+      risk_score: item.lastRiskScore
+    });
+  }
+
+  function removeCurrentFromWatchlist() {
+    const addressToRemove = selectedWatchlistItem?.address ?? selectedTokenAddress;
+    if (!addressToRemove) return;
+
+    setWatchlist((currentWatchlist) => removeWatchlistItem(currentWatchlist, addressToRemove));
+    trackEvent("watchlist_removed", {
+      ...tokenAnalyticsProperties(addressToRemove, selectedToken?.symbol ?? selectedWatchlistItem?.symbol),
+      risk_score: selectedWatchlistItem?.lastRiskScore ?? result?.score
+    });
+  }
+
+  function removeWatchlistListItem(item: WatchlistItem) {
+    setWatchlist((currentWatchlist) => removeWatchlistItem(currentWatchlist, item.address));
+    trackEvent("watchlist_removed", {
+      ...tokenAnalyticsProperties(item.address, item.symbol),
+      risk_score: item.lastRiskScore,
+      location: "watchlist"
+    });
   }
 
   async function copyPairAddress() {
@@ -1009,11 +1322,18 @@ function App() {
         onRescan={rescanHistoryItem}
       />
 
+      <WatchlistSection
+        disabled={isLoading}
+        onRemove={removeWatchlistListItem}
+        onRescan={rescanWatchlistItem}
+        watchlist={watchlist}
+      />
+
       <section className="dashboard" aria-live="polite">
         <article className={`risk-card ${result ? scoreTone(result.score) : ""} ${isLoading ? "loading" : ""}`}>
           <div className="card-heading">
             <div>
-              <p className="section-kicker">Risk score</p>
+              <p className="section-kicker">Overall Risk Score</p>
               <h2>{isLoading ? "Scanning token" : result ? result.verdict : "No scan selected"}</h2>
             </div>
             {isLoading ? (
@@ -1062,7 +1382,10 @@ function App() {
                   {selectedToken?.name ?? "Unknown token"}{" "}
                   {selectedToken?.symbol ? `(${selectedToken.symbol})` : ""}
                 </strong>
-                <span>Highest-liquidity Base pair selected for analysis.</span>
+                <span>
+                  {selectedPairs.length} Base {selectedPairs.length === 1 ? "market" : "markets"} found. Confidence:{" "}
+                  {result.breakdown.confidence.label}.
+                </span>
               </>
             ) : (
               <>
@@ -1083,45 +1406,25 @@ function App() {
         </section>
       </section>
 
+      <MarketsSection
+        loading={isLoading}
+        pairs={selectedPairs}
+        primaryPair={selectedPair}
+        tokenAddress={selectedToken?.address ?? normalizedAddress}
+        tokenSymbol={selectedToken?.symbol}
+      />
+
       <section className="detail-grid">
         <article className="panel">
           <div className="panel-head">
             <div>
-              <p className="section-kicker">Findings</p>
-              <h2>Human-readable risk signals</h2>
+              <p className="section-kicker">Risk breakdown</p>
+              <h2>Transparent scoring</h2>
             </div>
             <AlertTriangle size={22} />
           </div>
 
-          <div className="findings-list">
-            {isLoading ? (
-              <div className="analysis-state skeleton-state">
-                <Loader2 className="spin" size={22} />
-                <strong>Analyzing pair risk</strong>
-                <span className="skeleton-stack" aria-hidden="true">
-                  <span className="skeleton-line skeleton-long" />
-                  <span className="skeleton-line skeleton-mid" />
-                  <span className="skeleton-line skeleton-short" />
-                </span>
-              </div>
-            ) : result ? (
-              result.findings.map((finding) => (
-                <div className={`finding ${finding.tone}`} key={`${finding.title}-${finding.detail}`}>
-                  <div>
-                    <strong>{finding.title}</strong>
-                    <span>{finding.detail}</span>
-                  </div>
-                  <b>{finding.delta > 0 ? `+${finding.delta}` : finding.delta}</b>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">
-                <Search size={22} />
-                <strong>No findings yet</strong>
-                <span>Run a token scan to populate threshold-based risk signals.</span>
-              </div>
-            )}
-          </div>
+          <RiskBreakdown result={result} loading={isLoading} />
         </article>
 
         <article className="panel snapshot">
@@ -1142,6 +1445,28 @@ function App() {
           </dl>
 
           <div className="snapshot-actions">
+            {selectedWatchlistItem ? (
+              <button
+                className="snapshot-action"
+                disabled={!result || isLoading}
+                onClick={removeCurrentFromWatchlist}
+                type="button"
+              >
+                <Trash2 size={16} />
+                Remove from watchlist
+              </button>
+            ) : (
+              <button
+                className="snapshot-action"
+                disabled={!result || isLoading}
+                onClick={addCurrentToWatchlist}
+                type="button"
+              >
+                <CheckCircle2 size={16} />
+                Add to watchlist
+              </button>
+            )}
+
             <button
               className="snapshot-action"
               disabled={!selectedPair?.pairAddress || isLoading}
@@ -1269,6 +1594,307 @@ function App() {
         <span>Not financial advice.</span>
       </footer>
     </main>
+  );
+}
+
+function pairName(pair: DexPair) {
+  const base = pair.baseToken?.symbol ?? "Base";
+  const quote = pair.quoteToken?.symbol ?? "Quote";
+  return `${base}/${quote}`;
+}
+
+function dexName(pair: DexPair) {
+  return pair.dexId ? pair.dexId.toUpperCase() : "Unknown DEX";
+}
+
+function marketTxnCount(pair: DexPair) {
+  return (pair.txns?.h24?.buys ?? 0) + (pair.txns?.h24?.sells ?? 0);
+}
+
+function marketTxnText(pair: DexPair) {
+  if (!Number.isFinite(pair.txns?.h24?.buys) && !Number.isFinite(pair.txns?.h24?.sells)) {
+    return "Unavailable";
+  }
+
+  return numberText(marketTxnCount(pair));
+}
+
+function isLowLiquidityPair(pair: DexPair) {
+  const liquidity = pair.liquidity?.usd;
+  return Number.isFinite(liquidity) && (liquidity as number) < 50_000;
+}
+
+function isNewPair(pair: DexPair) {
+  const days = ageInDays(pair.pairCreatedAt);
+  return Number.isFinite(days) && (days as number) < 3;
+}
+
+function marketRowKey(pair: DexPair, index: number) {
+  return pair.pairAddress ?? pair.url ?? `${pair.dexId ?? "dex"}-${pairName(pair)}-${index}`;
+}
+
+function MarketsSection({
+  loading,
+  pairs,
+  primaryPair,
+  tokenAddress,
+  tokenSymbol
+}: {
+  loading: boolean;
+  pairs: DexPair[];
+  primaryPair?: DexPair;
+  tokenAddress?: string;
+  tokenSymbol?: string;
+}) {
+  const visiblePairs = pairs.slice(0, 5);
+
+  return (
+    <section className="panel markets-panel" aria-label="Markets">
+      <div className="panel-head">
+        <div>
+          <p className="section-kicker">Markets</p>
+          <h2>Base trading venues</h2>
+        </div>
+        <WalletCards size={22} />
+      </div>
+
+      {loading ? (
+        <div className="analysis-state skeleton-state">
+          <Loader2 className="spin" size={22} />
+          <strong>Loading markets</strong>
+          <span className="skeleton-stack" aria-hidden="true">
+            <span className="skeleton-line skeleton-long" />
+            <span className="skeleton-line skeleton-mid" />
+            <span className="skeleton-line skeleton-short" />
+          </span>
+        </div>
+      ) : visiblePairs.length ? (
+        <div className="markets-list">
+          {visiblePairs.map((pair, index) => {
+            const isPrimary = sameAddress(pair.pairAddress, primaryPair?.pairAddress) || (!primaryPair?.pairAddress && index === 0);
+            return (
+              <article className="market-row" key={marketRowKey(pair, index)}>
+                <div className="market-title">
+                  <strong>{pairName(pair)}</strong>
+                  <span>{dexName(pair)}</span>
+                </div>
+                <div className="market-badges">
+                  {isPrimary ? <span className="market-badge primary">Primary market</span> : null}
+                  {isLowLiquidityPair(pair) ? <span className="market-badge warning">Low liquidity</span> : null}
+                  {isNewPair(pair) ? <span className="market-badge danger">Newly created pair</span> : null}
+                </div>
+                <dl className="market-metrics">
+                  <div>
+                    <dt>Liquidity</dt>
+                    <dd>{currency(pair.liquidity?.usd, true)}</dd>
+                  </div>
+                  <div>
+                    <dt>24h volume</dt>
+                    <dd>{currency(pair.volume?.h24, true)}</dd>
+                  </div>
+                  <div>
+                    <dt>24h txns</dt>
+                    <dd>{marketTxnText(pair)}</dd>
+                  </div>
+                  <div>
+                    <dt>Pair age</dt>
+                    <dd>{pairAgeText(pair.pairCreatedAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Price</dt>
+                    <dd>{pair.priceUsd ? currency(Number(pair.priceUsd)) : "Unavailable"}</dd>
+                  </div>
+                </dl>
+                {pair.url ? (
+                  <a
+                    className="market-link"
+                    href={pair.url}
+                    onClick={() =>
+                      trackEvent("market_opened", {
+                        ...tokenAnalyticsProperties(tokenAddress, tokenSymbol),
+                        dex_name: pair.dexId,
+                        pair_short_address: shortAddress(pair.pairAddress),
+                        primary_market: isPrimary,
+                        position: index + 1
+                      })
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    DEX Screener
+                    <ExternalLink size={15} />
+                  </a>
+                ) : (
+                  <span className="market-link disabled">DEX Screener unavailable</span>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty-state compact-empty">
+          <Search size={22} />
+          <strong>No markets loaded</strong>
+          <span>Run a token scan to show Base pairs.</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function reasonDeltaText(delta: number) {
+  if (delta > 0) return `+${delta}`;
+  return String(delta);
+}
+
+function ScoreBucket({
+  score,
+  title,
+  subtitle,
+  reasons
+}: {
+  score: number;
+  title: string;
+  subtitle?: string;
+  reasons: ScoreReason[];
+}) {
+  return (
+    <article className="score-bucket">
+      <div className="score-bucket-head">
+        <div>
+          <strong>{title}</strong>
+          {subtitle ? <span>{subtitle}</span> : null}
+        </div>
+        <b>{score}/96</b>
+      </div>
+      <div className="score-reasons">
+        {reasons.map((reason) => (
+          <div className={`score-reason ${reason.tone}`} key={`${title}-${reason.title}-${reason.detail}`}>
+            <div>
+              <strong>{reason.title}</strong>
+              <span>{reason.detail}</span>
+            </div>
+            <b>{reasonDeltaText(reason.delta)}</b>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function RiskBreakdown({ result, loading }: { result: ScanResult | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="findings-list">
+        <div className="analysis-state skeleton-state">
+          <Loader2 className="spin" size={22} />
+          <strong>Scoring risk</strong>
+          <span className="skeleton-stack" aria-hidden="true">
+            <span className="skeleton-line skeleton-long" />
+            <span className="skeleton-line skeleton-mid" />
+            <span className="skeleton-line skeleton-short" />
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!result) {
+    return (
+      <div className="findings-list">
+        <div className="empty-state">
+          <Search size={22} />
+          <strong>No score yet</strong>
+          <span>Run a token scan to populate market, contract, and confidence scoring.</span>
+        </div>
+      </div>
+    );
+  }
+
+  const confidence = result.breakdown.confidence;
+
+  return (
+    <div className="score-breakdown">
+      <ScoreBucket
+        score={result.breakdown.overall}
+        title="Overall Risk Score"
+        subtitle="Weighted from market risk, contract risk, and confidence."
+        reasons={[
+          {
+            title: "Weighted score",
+            detail: `Market ${result.breakdown.market}/96, contract ${result.breakdown.contract}/96, data confidence ${confidence.score}/96.`,
+            delta: 0,
+            tone: "neutral"
+          }
+        ]}
+      />
+      <ScoreBucket score={result.breakdown.market} title="Market Risk" reasons={result.breakdown.marketReasons} />
+      <ScoreBucket score={result.breakdown.contract} title="Contract Risk" reasons={result.breakdown.contractReasons} />
+      <ScoreBucket
+        score={confidence.score}
+        title="Data Confidence"
+        subtitle={`${confidence.label} confidence. ${confidence.completedChecks.length} completed checks, ${confidence.unavailableChecks.length} unavailable.`}
+        reasons={confidence.reasons}
+      />
+    </div>
+  );
+}
+
+function WatchlistSection({
+  disabled,
+  onRemove,
+  onRescan,
+  watchlist
+}: {
+  disabled: boolean;
+  onRemove: (item: WatchlistItem) => void;
+  onRescan: (item: WatchlistItem) => void;
+  watchlist: WatchlistItem[];
+}) {
+  return (
+    <section className="watchlist-section" aria-label="Watchlist">
+      <div className="recent-head">
+        <div>
+          <p className="section-kicker">Watchlist</p>
+          <h2>Saved Base tokens</h2>
+        </div>
+      </div>
+
+      {watchlist.length ? (
+        <div className="watchlist-list">
+          {watchlist.map((item) => (
+            <article className="watchlist-item" key={item.address}>
+              <span className="recent-logo" aria-hidden="true">
+                {item.tokenLogo ? <img src={item.tokenLogo} alt="" loading="lazy" referrerPolicy="no-referrer" /> : item.symbol.slice(0, 2)}
+              </span>
+              <span className="recent-main">
+                <strong>{item.symbol}</strong>
+                <span>{item.shortAddress}</span>
+              </span>
+              <span className="recent-meta">
+                <b>{item.lastRiskScore}/96</b>
+                <span>{historyTimestampText(item.lastScannedAt)}</span>
+              </span>
+              <span className="watchlist-actions">
+                <button disabled={disabled} onClick={() => onRescan(item)} type="button">
+                  <RefreshCw size={15} />
+                  Rescan
+                </button>
+                <button disabled={disabled} onClick={() => onRemove(item)} type="button">
+                  <Trash2 size={15} />
+                  Remove
+                </button>
+              </span>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="recent-empty">
+          <History size={18} />
+          <span>Saved tokens appear here.</span>
+        </div>
+      )}
+    </section>
   );
 }
 

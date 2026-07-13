@@ -7,7 +7,11 @@ type AnalyticsEventName =
   | "example_token_clicked"
   | "copy_pair_address"
   | "open_basescan"
-  | "open_dexscreener";
+  | "open_dexscreener"
+  | "market_opened"
+  | "watchlist_added"
+  | "watchlist_removed"
+  | "watchlist_rescan";
 
 type AnalyticsProperties = Record<string, boolean | number | string | undefined>;
 

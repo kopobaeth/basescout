@@ -152,14 +152,36 @@ function parseDexResponse(value: unknown): DexResponse {
   };
 }
 
-function pickBestBasePair(pairs: DexPair[], tokenAddress: string) {
-  const basePairs = pairs.filter(
-    (pair) =>
-      pair.chainId === "base" &&
-      (sameAddress(pair.baseToken?.address, tokenAddress) || sameAddress(pair.quoteToken?.address, tokenAddress))
-  );
+function pairIdentity(pair: DexPair) {
+  if (pair.pairAddress) return `pair:${pair.pairAddress.toLowerCase()}`;
+  if (pair.url) return `url:${pair.url.toLowerCase()}`;
 
-  return [...basePairs].sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0] ?? null;
+  const base = pair.baseToken?.address?.toLowerCase() ?? "";
+  const quote = pair.quoteToken?.address?.toLowerCase() ?? "";
+  if (!pair.dexId || (!base && !quote)) return undefined;
+  return `tokens:${pair.dexId.toLowerCase()}:${base}:${quote}:${pair.pairCreatedAt ?? "unknown"}`;
+}
+
+function normalizeBasePairs(pairs: DexPair[], tokenAddress: string) {
+  const seen = new Set<string>();
+  const normalized: DexPair[] = [];
+
+  for (const pair of pairs) {
+    if (
+      pair.chainId !== "base" ||
+      (!sameAddress(pair.baseToken?.address, tokenAddress) && !sameAddress(pair.quoteToken?.address, tokenAddress))
+    ) {
+      continue;
+    }
+
+    const identity = pairIdentity(pair);
+    if (!identity || seen.has(identity)) continue;
+
+    seen.add(identity);
+    normalized.push(pair);
+  }
+
+  return normalized.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
 }
 
 async function fetchJson(url: URL | string, timeoutMs: number, label: string) {
@@ -187,11 +209,11 @@ async function fetchJson(url: URL | string, timeoutMs: number, label: string) {
   }
 }
 
-async function fetchDexPair(tokenAddress: string) {
+async function fetchDexPairs(tokenAddress: string) {
   const url = `https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(tokenAddress)}`;
   const json = await fetchJson(url, DEX_TIMEOUT_MS, "DEX Screener");
   const pairs = parseDexResponse(json).pairs ?? [];
-  return pickBestBasePair(pairs, tokenAddress);
+  return normalizeBasePairs(pairs, tokenAddress);
 }
 
 function parseEtherscanArrayResult(value: unknown) {
@@ -459,7 +481,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     const [dexResult, baseScanResult] = await Promise.allSettled([
-      fetchDexPair(address),
+      fetchDexPairs(address),
       fetchBaseScanIntelligence(address)
     ]);
     const baseScan =
@@ -483,6 +505,7 @@ export default async function handler(request: IncomingMessage, response: Server
       sendJson(response, 502, {
         address,
         pair: null,
+        pairs: [],
         baseScan,
         error: details.error,
         errorCode: details.errorCode,
@@ -491,10 +514,14 @@ export default async function handler(request: IncomingMessage, response: Server
       return;
     }
 
-    if (!dexResult.value) {
+    const pairs = dexResult.value;
+    const pair = pairs[0] ?? null;
+
+    if (!pair) {
       sendJson(response, 404, {
         address,
         pair: null,
+        pairs,
         baseScan,
         error: noBasePairMessage(),
         errorCode: "no_base_pair",
@@ -505,7 +532,8 @@ export default async function handler(request: IncomingMessage, response: Server
 
     sendJson(response, 200, {
       address,
-      pair: dexResult.value,
+      pair,
+      pairs,
       baseScan,
       errors: Object.keys(errors).length ? errors : undefined
     });

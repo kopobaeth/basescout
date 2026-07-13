@@ -44,6 +44,32 @@ export type Finding = {
   tone: FindingTone;
 };
 
+export type ConfidenceLabel = "High" | "Medium" | "Low";
+
+export type ScoreReason = {
+  title: string;
+  detail: string;
+  delta: number;
+  tone: FindingTone;
+};
+
+export type DataConfidence = {
+  score: number;
+  label: ConfidenceLabel;
+  completedChecks: string[];
+  unavailableChecks: string[];
+  reasons: ScoreReason[];
+};
+
+export type RiskScoreBreakdown = {
+  overall: number;
+  market: number;
+  contract: number;
+  confidence: DataConfidence;
+  marketReasons: ScoreReason[];
+  contractReasons: ScoreReason[];
+};
+
 export type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
 export type VerificationStatus = "verified" | "unverified" | "unknown";
 export type BaseScanUnavailableReason =
@@ -73,10 +99,12 @@ export type BaseScanIntelligence = {
 
 export type ScanResult = {
   pair: DexPair;
+  pairs: DexPair[];
   targetToken: DexToken;
   baseScan: BaseScanIntelligence;
   score: number;
   verdict: string;
+  breakdown: RiskScoreBreakdown;
   findings: Finding[];
 };
 
@@ -91,6 +119,7 @@ export type ScanErrorCode =
 export type ScanApiResponse = {
   address: string;
   pair: DexPair | null;
+  pairs: DexPair[];
   baseScan: BaseScanIntelligence;
   error?: string;
   errorCode?: ScanErrorCode;
@@ -107,4 +136,13 @@ export type ScanHistoryItem = {
   timestamp: number;
   riskScore: number;
   tokenLogo?: string;
+};
+
+export type WatchlistItem = {
+  address: string;
+  shortAddress: string;
+  symbol: string;
+  tokenLogo?: string;
+  lastRiskScore: number;
+  lastScannedAt: number;
 };
