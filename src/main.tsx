@@ -1302,13 +1302,19 @@ function App() {
       <nav className="topbar" aria-label="Primary navigation">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <img src="/basescout-logo.png" alt="" width="34" height="34" />
+            <img src="/basescout-logo.png?v=2" alt="" width="32" height="32" />
           </span>
           <span>BaseScout</span>
         </div>
-        <div className="network-pill">
-          <span className="status-dot" />
-          Base mainnet
+        <div className="topbar-actions">
+          <div className="network-pill">
+            <span className="status-dot" />
+            Base mainnet
+          </div>
+          <a className="header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Follow on X">
+            <X size={16} />
+            <span>Follow on X</span>
+          </a>
         </div>
       </nav>
       <p className="data-note">Data from DEX Screener and BaseScan.</p>
