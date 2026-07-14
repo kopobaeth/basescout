@@ -1313,7 +1313,7 @@ function App() {
           </div>
           <a className="header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Follow on X">
             <X size={16} />
-            <span>Follow on X</span>
+            <span>X</span>
           </a>
         </div>
       </nav>
@@ -1669,13 +1669,7 @@ function App() {
 
       <footer className="app-footer">
         <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
-        <div className="footer-actions">
-          <span>Not financial advice.</span>
-          <a href="https://x.com/kopobaeth" target="_blank" rel="noreferrer" aria-label="Follow BaseScout on X">
-            <X size={16} />
-            Follow on X
-          </a>
-        </div>
+        <span>Not financial advice.</span>
       </footer>
     </main>
   );
