@@ -23,7 +23,8 @@ import {
   ShieldQuestion,
   ShieldX,
   Trash2,
-  WalletCards
+  WalletCards,
+  X
 } from "lucide-react";
 import { initPostHog, shortAddress, tokenAnalyticsProperties, trackEvent } from "./analytics";
 import {
@@ -1301,7 +1302,7 @@ function App() {
       <nav className="topbar" aria-label="Primary navigation">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <ScanLine size={18} />
+            <img src="/basescout-logo.png" alt="" width="34" height="34" />
           </span>
           <span>BaseScout</span>
         </div>
@@ -1662,7 +1663,13 @@ function App() {
 
       <footer className="app-footer">
         <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
-        <span>Not financial advice.</span>
+        <div className="footer-actions">
+          <span>Not financial advice.</span>
+          <a href="https://x.com/kopobaeth" target="_blank" rel="noreferrer" aria-label="Follow BaseScout on X">
+            <X size={16} />
+            Follow on X
+          </a>
+        </div>
       </footer>
     </main>
   );
