@@ -1543,10 +1543,10 @@ function App() {
           <span>BaseScout</span>
         </div>
         <div className="topbar-actions">
-          <a className={`nav-link ${isTrendingPage ? "active" : ""}`} href="/trending" onClick={handleTrendingNav}>
+          <a className={`header-action-button nav-link ${isTrendingPage ? "active" : ""}`} href="/trending" onClick={handleTrendingNav}>
             Trending
           </a>
-          <a className="header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
+          <a className="header-action-button header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
             <X size={16} />
             <span>Updates on X</span>
           </a>

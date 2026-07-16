@@ -57,8 +57,7 @@ span.disabled {
 .brand,
 .network-pill,
 .topbar-actions,
-.nav-link,
-.header-x-link {
+.header-action-button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -105,12 +104,14 @@ span.disabled {
   white-space: nowrap;
 }
 
-.nav-link,
-.header-x-link {
+.header-action-button {
   min-height: 38px;
   padding: 0 16px;
+  color: var(--base-blue);
   background: #ffffff;
+  border: 1px solid rgba(0, 82, 255, 0.24);
   border-radius: 8px;
+  font-family: inherit;
   font-size: 0.95rem;
   font-weight: 800;
   text-decoration: none;
@@ -121,26 +122,11 @@ span.disabled {
     color 0.16s ease;
 }
 
-.header-x-link {
-  color: var(--ink);
-  border: 1px solid transparent;
-}
-
-.header-x-link:hover {
-  background: rgba(0, 82, 255, 0.08);
-  border-color: rgba(0, 82, 255, 0.46);
-}
-
-.nav-link {
-  color: var(--base-blue);
-  border: 1px solid rgba(0, 82, 255, 0.24);
-}
-
-.nav-link:hover,
-.nav-link.active {
+.header-action-button:hover,
+.header-action-button.active {
   color: var(--base-blue);
   background: rgba(0, 82, 255, 0.08);
-  border-color: rgba(0, 82, 255, 0.38);
+  border-color: var(--base-blue);
 }
 
 .header-x-link svg {
@@ -1641,8 +1627,7 @@ h2 {
     flex-wrap: wrap;
   }
 
-  .nav-link,
-  .header-x-link {
+  .header-action-button {
     min-height: 32px;
     padding: 0 9px;
     font-size: 0.84rem;
