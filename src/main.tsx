@@ -67,7 +67,7 @@ declare global {
 
 type ScanStatus = "idle" | "loading" | "success" | "error";
 type CopyState = "idle" | "copied" | "failed";
-type ScanSource = "manual" | "example" | "history" | "watchlist";
+type ScanSource = "manual" | "example" | "history" | "route" | "watchlist";
 
 type ScanContext = {
   source: ScanSource;
@@ -82,6 +82,10 @@ type ScanErrorView = {
 
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const REQUEST_TIMEOUT_MS = 15_000;
+const HOME_TITLE = document.title;
+const HOME_DESCRIPTION =
+  document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ??
+  "BaseScout is a Base token risk scanner using DEX Screener liquidity data and secure serverless BaseScan contract intelligence.";
 const EXAMPLE_TOKENS = [
   {
     symbol: "AERO",
@@ -157,6 +161,80 @@ function emptyBaseScanIntelligence(status: BaseScanStatus = "idle", reason?: Bas
 
 function baseScanUrlFor(address?: string) {
   return address ? `https://basescan.org/token/${address}` : undefined;
+}
+
+function tokenPath(address: string) {
+  return `/token/${address}`;
+}
+
+function tokenPageUrl(address: string) {
+  return new URL(tokenPath(address), window.location.origin).toString();
+}
+
+function tokenRouteAddress(pathname = window.location.pathname) {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length !== 2 || segments[0] !== "token") return undefined;
+
+  try {
+    return decodeURIComponent(segments[1]);
+  } catch {
+    return segments[1];
+  }
+}
+
+function writeTokenRoute(address: string, mode: "push" | "replace" = "push") {
+  const nextPath = tokenPath(address);
+  if (window.location.pathname === nextPath && !window.location.search && !window.location.hash) return;
+
+  const nextUrl = tokenPageUrl(address);
+  if (mode === "replace") {
+    window.history.replaceState({ tokenAddress: address }, "", nextUrl);
+    return;
+  }
+
+  window.history.pushState({ tokenAddress: address }, "", nextUrl);
+}
+
+function ensureMetaDescription() {
+  const existing = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+  if (existing) return existing;
+
+  const meta = document.createElement("meta");
+  meta.name = "description";
+  document.head.append(meta);
+  return meta;
+}
+
+function ensureCanonicalLink() {
+  const existing = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (existing) return existing;
+
+  const link = document.createElement("link");
+  link.rel = "canonical";
+  document.head.append(link);
+  return link;
+}
+
+function setPageMetadata(title: string, description: string, canonicalUrl: string) {
+  document.title = title;
+  ensureMetaDescription().content = description;
+  ensureCanonicalLink().href = canonicalUrl;
+}
+
+function restoreHomeMetadata() {
+  setPageMetadata(HOME_TITLE, HOME_DESCRIPTION, new URL("/", window.location.origin).toString());
+}
+
+function securitySummaryText(security: SecurityIntelligence) {
+  if (security.status === "unavailable") return "Security data unavailable.";
+  if (security.criticalCount > 0) return `${security.criticalCount} critical security warning${security.criticalCount === 1 ? "" : "s"}.`;
+  if (security.warningCount > 0) return `${security.warningCount} security warning${security.warningCount === 1 ? "" : "s"}.`;
+  if (security.unavailableChecks.length > 0) return `${security.unavailableChecks.length} unavailable security check${security.unavailableChecks.length === 1 ? "" : "s"}.`;
+  return "No critical security findings reported.";
+}
+
+function tokenMetadataDescription(result: ScanResult) {
+  return `Liquidity ${currency(result.pair.liquidity?.usd, true)}, risk score ${result.score}/96. ${securitySummaryText(result.security)}`;
 }
 
 function hasPartialContractIntelligenceFailure(baseScan: BaseScanIntelligence) {
@@ -1029,6 +1107,7 @@ function App() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [baseScan, setBaseScan] = useState<BaseScanIntelligence>(() => emptyBaseScanIntelligence());
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [linkCopyState, setLinkCopyState] = useState<CopyState>("idle");
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>(() => readScanHistory());
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => readWatchlist());
   const activeRequestRef = useRef<AbortController | null>(null);
@@ -1089,10 +1168,62 @@ function App() {
     }
   }, [normalizedAddress, result]);
 
+  useEffect(() => {
+    const routeAddress = tokenRouteAddress();
+
+    if (!routeAddress) {
+      restoreHomeMetadata();
+      return;
+    }
+
+    const tokenAddress = selectedTokenAddress ?? normalizedAddress;
+    if (!ADDRESS_PATTERN.test(routeAddress) || !result || !sameAddress(routeAddress, tokenAddress)) {
+      setPageMetadata("Token Risk Scan | BaseScout", HOME_DESCRIPTION, tokenPageUrl(routeAddress));
+      return;
+    }
+
+    const symbol = result.targetToken.symbol ?? shortAddress(tokenAddress) ?? "Token";
+    setPageMetadata(
+      `${symbol} Risk Scan | BaseScout`,
+      tokenMetadataDescription(result),
+      tokenPageUrl(tokenAddress)
+    );
+  }, [normalizedAddress, result, selectedTokenAddress]);
+
+  useEffect(() => {
+    function handleTokenRoute() {
+      const routeAddress = tokenRouteAddress();
+      if (!routeAddress) {
+        restoreHomeMetadata();
+        return;
+      }
+
+      setAddress(routeAddress);
+      setCopyState("idle");
+      setLinkCopyState("idle");
+
+      if (!ADDRESS_PATTERN.test(routeAddress)) {
+        setStatus("error");
+        setResult(null);
+        setBaseScan(emptyBaseScanIntelligence());
+        setErrorState(scanErrorView("invalid_address"));
+        setPageMetadata("Token Risk Scan | BaseScout", HOME_DESCRIPTION, tokenPageUrl(routeAddress));
+        return;
+      }
+
+      void scanToken(routeAddress, { source: "route" });
+    }
+
+    handleTokenRoute();
+    window.addEventListener("popstate", handleTokenRoute);
+    return () => window.removeEventListener("popstate", handleTokenRoute);
+  }, []);
+
   function resetForInput(nextAddress: string) {
     setAddress(nextAddress);
     setErrorState(null);
     setCopyState("idle");
+    setLinkCopyState("idle");
 
     if (status !== "idle" || result) {
       scanIdRef.current += 1;
@@ -1122,6 +1253,7 @@ function App() {
     setAddress(tokenAddress);
     setErrorState(null);
     setCopyState("idle");
+    setLinkCopyState("idle");
     trackEvent("scan_clicked", scanEventProperties);
 
     if (!ADDRESS_PATTERN.test(tokenAddress)) {
@@ -1177,9 +1309,11 @@ function App() {
       const scanResult = calculateRiskBreakdown(payload.pair, payload.pairs, tokenAddress, baseScanIntelligence, securityIntelligence);
       const historyItem = buildScanHistoryItem(scanResult, tokenAddress);
       const watchlistItem = buildWatchlistItem(scanResult, tokenAddress);
+      const routeAddress = historyItem?.address ?? scanResult.targetToken.address ?? tokenAddress;
 
       setResult(scanResult);
       setStatus("success");
+      writeTokenRoute(routeAddress, context.source === "route" ? "replace" : "push");
       if (historyItem) {
         setScanHistory((currentHistory) => upsertScanHistoryItem(currentHistory, historyItem));
       }
@@ -1294,6 +1428,19 @@ function App() {
       window.setTimeout(() => setCopyState("idle"), 1600);
     } catch {
       setCopyState("failed");
+    }
+  }
+
+  async function copyTokenLink() {
+    const addressToCopy = selectedTokenAddress ?? normalizedAddress;
+    if (!ADDRESS_PATTERN.test(addressToCopy)) return;
+
+    try {
+      await writeClipboardText(tokenPageUrl(addressToCopy));
+      setLinkCopyState("copied");
+      window.setTimeout(() => setLinkCopyState("idle"), 1600);
+    } catch {
+      setLinkCopyState("failed");
     }
   }
 
@@ -1532,6 +1679,16 @@ function App() {
                 Add to watchlist
               </button>
             )}
+
+            <button
+              className="snapshot-action"
+              disabled={!result || !selectedTokenAddress || isLoading}
+              onClick={() => void copyTokenLink()}
+              type="button"
+            >
+              {linkCopyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
+              {linkCopyState === "copied" ? "Link copied" : linkCopyState === "failed" ? "Copy failed" : "Copy link"}
+            </button>
 
             <button
               className="snapshot-action"
