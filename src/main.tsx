@@ -237,6 +237,26 @@ function tokenMetadataDescription(result: ScanResult) {
   return `Liquidity ${currency(result.pair.liquidity?.usd, true)}, risk score ${result.score}/96. ${securitySummaryText(result.security)}`;
 }
 
+function tokenShareText(result: ScanResult, tokenAddress: string) {
+  const lines: string[] = [];
+  const symbol = result.targetToken.symbol?.trim();
+
+  if (symbol) lines.push(`I just scanned ${symbol} on BaseScout.`);
+  if (Number.isFinite(result.score)) lines.push(`Risk score: ${result.score}`);
+  if (Number.isFinite(result.pair.liquidity?.usd)) lines.push(`Liquidity: ${currency(result.pair.liquidity?.usd, true)}`);
+
+  lines.push("Research Base tokens before you interact.");
+  lines.push(tokenPageUrl(tokenAddress));
+
+  return lines.join("\n\n");
+}
+
+function xPostComposerUrl(result: ScanResult, tokenAddress: string) {
+  const url = new URL("https://x.com/intent/post");
+  url.searchParams.set("text", tokenShareText(result, tokenAddress));
+  return url.toString();
+}
+
 function hasPartialContractIntelligenceFailure(baseScan: BaseScanIntelligence) {
   if (baseScan.status === "unavailable") {
     return Boolean(baseScan.reason && !["missing-key", "no-data"].includes(baseScan.reason));
@@ -1121,6 +1141,8 @@ function App() {
   const selectedPairs = result?.pairs ?? [];
   const selectedToken = result?.targetToken;
   const selectedTokenAddress = selectedToken?.address ?? (isValidAddress ? normalizedAddress : undefined);
+  const shareOnXUrl =
+    status === "success" && result && selectedTokenAddress ? xPostComposerUrl(result, selectedTokenAddress) : undefined;
   const selectedWatchlistItem = watchlist.find((item) => sameAddress(item.address, selectedTokenAddress));
   const activeBaseScan = result?.baseScan ?? baseScan;
   const baseScanTokenAddress = selectedTokenAddress;
@@ -1689,6 +1711,13 @@ function App() {
               {linkCopyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
               {linkCopyState === "copied" ? "Link copied" : linkCopyState === "failed" ? "Copy failed" : "Copy link"}
             </button>
+
+            {shareOnXUrl ? (
+              <a className="snapshot-action" href={shareOnXUrl} target="_blank" rel="noopener noreferrer">
+                <X size={16} />
+                Share on X
+              </a>
+            ) : null}
 
             <button
               className="snapshot-action"
