@@ -189,3 +189,37 @@ export type WatchlistItem = {
   lastRiskScore: number;
   lastScannedAt: number;
 };
+
+export type TrendingTokenSide = "base" | "quote";
+
+export type TrendingToken = {
+  side: TrendingTokenSide;
+  name?: string;
+  symbol?: string;
+  address?: string;
+  scannable: boolean;
+};
+
+export type TrendingPool = {
+  id: string;
+  pairName: string;
+  poolAddress?: string;
+  dexName: string;
+  priceUsd?: string;
+  priceChangeH24?: number;
+  volumeH24Usd?: number;
+  liquidityUsd?: number;
+  buysH24?: number;
+  sellsH24?: number;
+  poolCreatedAt?: number;
+  baseToken: TrendingToken;
+  quoteToken: TrendingToken;
+};
+
+export type TrendingApiResponse = {
+  source: "geckoterminal";
+  attribution: "Data by GeckoTerminal";
+  updatedAt: number;
+  cacheSeconds: number;
+  pools: TrendingPool[];
+};

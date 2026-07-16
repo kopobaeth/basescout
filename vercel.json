@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/trending",
+      "destination": "/index.html"
+    },
+    {
       "source": "/token/:address",
       "destination": "/index.html"
     }

@@ -56,6 +56,9 @@ import type {
   ScoreReason,
   SecurityFinding,
   SecurityIntelligence,
+  TrendingApiResponse,
+  TrendingPool,
+  TrendingToken,
   WatchlistItem
 } from "./types";
 
@@ -73,6 +76,8 @@ type ScanContext = {
   source: ScanSource;
   symbol?: string;
 };
+
+type TrendingStatus = "idle" | "loading" | "success" | "error";
 
 type ScanErrorView = {
   code: ScanErrorCode;
@@ -171,6 +176,18 @@ function tokenPageUrl(address: string) {
   return new URL(tokenPath(address), window.location.origin).toString();
 }
 
+function trendingPath() {
+  return "/trending";
+}
+
+function trendingPageUrl() {
+  return new URL(trendingPath(), window.location.origin).toString();
+}
+
+function isTrendingPath(pathname = window.location.pathname) {
+  return pathname === trendingPath();
+}
+
 function tokenRouteAddress(pathname = window.location.pathname) {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length !== 2 || segments[0] !== "token") return undefined;
@@ -225,6 +242,14 @@ function restoreHomeMetadata() {
   setPageMetadata(HOME_TITLE, HOME_DESCRIPTION, new URL("/", window.location.origin).toString());
 }
 
+function setTrendingMetadata() {
+  setPageMetadata(
+    "Trending Base Pools | BaseScout",
+    "Pools currently trending by market activity and GeckoTerminal signals.",
+    trendingPageUrl()
+  );
+}
+
 function securitySummaryText(security: SecurityIntelligence) {
   if (security.status === "unavailable") return "Security data unavailable.";
   if (security.criticalCount > 0) return `${security.criticalCount} critical security warning${security.criticalCount === 1 ? "" : "s"}.`;
@@ -255,6 +280,18 @@ function xPostComposerUrl(result: ScanResult, tokenAddress: string) {
   const url = new URL("https://x.com/intent/post");
   url.searchParams.set("text", tokenShareText(result, tokenAddress));
   return url.toString();
+}
+
+function parseTrendingApiResponse(value: unknown): TrendingApiResponse | undefined {
+  if (!isRecord(value) || !Array.isArray(value.pools)) return undefined;
+
+  return {
+    source: value.source === "geckoterminal" ? "geckoterminal" : "geckoterminal",
+    attribution: "Data by GeckoTerminal",
+    updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : Date.now(),
+    cacheSeconds: typeof value.cacheSeconds === "number" ? value.cacheSeconds : 60,
+    pools: value.pools.filter(isRecord).map((pool) => pool as TrendingPool)
+  };
 }
 
 function hasPartialContractIntelligenceFailure(baseScan: BaseScanIntelligence) {
@@ -1121,6 +1158,7 @@ function scoreTone(score: number) {
 }
 
 function App() {
+  const [routePath, setRoutePath] = useState(() => window.location.pathname);
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState<ScanStatus>("idle");
   const [errorState, setErrorState] = useState<ScanErrorView | null>(null);
@@ -1128,6 +1166,9 @@ function App() {
   const [baseScan, setBaseScan] = useState<BaseScanIntelligence>(() => emptyBaseScanIntelligence());
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [linkCopyState, setLinkCopyState] = useState<CopyState>("idle");
+  const [trendingStatus, setTrendingStatus] = useState<TrendingStatus>("idle");
+  const [trendingError, setTrendingError] = useState("");
+  const [trendingData, setTrendingData] = useState<TrendingApiResponse | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>(() => readScanHistory());
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => readWatchlist());
   const activeRequestRef = useRef<AbortController | null>(null);
@@ -1135,6 +1176,7 @@ function App() {
   const securityAnalyticsRef = useRef("");
 
   const normalizedAddress = address.trim();
+  const isTrendingPage = isTrendingPath(routePath);
   const isValidAddress = ADDRESS_PATTERN.test(normalizedAddress);
   const isLoading = status === "loading";
   const selectedPair = result?.pair;
@@ -1191,6 +1233,11 @@ function App() {
   }, [normalizedAddress, result]);
 
   useEffect(() => {
+    if (isTrendingPage) {
+      setTrendingMetadata();
+      return;
+    }
+
     const routeAddress = tokenRouteAddress();
 
     if (!routeAddress) {
@@ -1210,10 +1257,17 @@ function App() {
       tokenMetadataDescription(result),
       tokenPageUrl(tokenAddress)
     );
-  }, [normalizedAddress, result, selectedTokenAddress]);
+  }, [isTrendingPage, normalizedAddress, result, selectedTokenAddress]);
 
   useEffect(() => {
     function handleTokenRoute() {
+      setRoutePath(window.location.pathname);
+
+      if (isTrendingPath()) {
+        setTrendingMetadata();
+        return;
+      }
+
       const routeAddress = tokenRouteAddress();
       if (!routeAddress) {
         restoreHomeMetadata();
@@ -1240,6 +1294,42 @@ function App() {
     window.addEventListener("popstate", handleTokenRoute);
     return () => window.removeEventListener("popstate", handleTokenRoute);
   }, []);
+
+  useEffect(() => {
+    if (!isTrendingPage || trendingStatus !== "idle") return;
+
+    const controller = new AbortController();
+
+    async function loadTrendingPools() {
+      setTrendingStatus("loading");
+      setTrendingError("");
+
+      try {
+        const response = await fetch("/api/trending", {
+          signal: controller.signal
+        });
+        const contentType = response.headers.get("content-type") ?? "";
+        const json = contentType.includes("application/json") ? await response.json().catch(() => undefined) : undefined;
+
+        if (!response.ok) {
+          const providerMessage = isRecord(json) ? stringValue(json.error) : undefined;
+          throw new Error(providerMessage ?? "GeckoTerminal trending pools could not be loaded.");
+        }
+
+        const payload = parseTrendingApiResponse(json);
+        setTrendingData(payload ?? null);
+        setTrendingStatus("success");
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        setTrendingData(null);
+        setTrendingStatus("error");
+        setTrendingError(error instanceof Error ? error.message : "GeckoTerminal trending pools could not be loaded.");
+      }
+    }
+
+    void loadTrendingPools();
+    return () => controller.abort();
+  }, [isTrendingPage, trendingStatus]);
 
   function resetForInput(nextAddress: string) {
     setAddress(nextAddress);
@@ -1386,6 +1476,15 @@ function App() {
     void scanToken(address, { source: "manual" });
   }
 
+  function handleTrendingNav(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    if (!isTrendingPage) {
+      window.history.pushState({}, "", trendingPageUrl());
+      setRoutePath(trendingPath());
+    }
+    setTrendingMetadata();
+  }
+
   function rescanHistoryItem(item: ScanHistoryItem) {
     if (isLoading) return;
     void scanToken(item.address, { source: "history", symbol: item.symbol });
@@ -1476,6 +1575,9 @@ function App() {
           <span>BaseScout</span>
         </div>
         <div className="topbar-actions">
+          <a className={`nav-link ${isTrendingPage ? "active" : ""}`} href="/trending" onClick={handleTrendingNav}>
+            Trending
+          </a>
           <div className="network-pill">
             <span className="status-dot" />
             Base mainnet
@@ -1488,6 +1590,15 @@ function App() {
       </nav>
       <p className="data-note">Data from DEX Screener and BaseScan.</p>
 
+      {isTrendingPage ? (
+        <TrendingPage
+          data={trendingData}
+          error={trendingError}
+          onRetry={() => setTrendingStatus("idle")}
+          status={trendingStatus}
+        />
+      ) : (
+        <>
       <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">Base token risk scanner</p>
@@ -1852,6 +1963,8 @@ function App() {
           <SecurityIntelligencePanel security={result?.security} loading={isLoading} />
         </article>
       </section>
+        </>
+      )}
 
       <footer className="app-footer">
         <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
@@ -2317,6 +2430,137 @@ function SnapshotRow({ label, value, mono = false, loading = false }: { label: s
       <dt>{label}</dt>
       <dd className={className}>{loading ? <span className="skeleton-line skeleton-mid" /> : value}</dd>
     </div>
+  );
+}
+
+function trendingTokenLabel(token: TrendingToken) {
+  return token.symbol ?? (token.side === "base" ? "Base token" : "Quote token");
+}
+
+function trendingTokenScanChoices(pool: TrendingPool) {
+  return [pool.baseToken, pool.quoteToken].filter((token) => token.scannable && token.address);
+}
+
+function TrendingPage({
+  data,
+  error,
+  onRetry,
+  status
+}: {
+  data: TrendingApiResponse | null;
+  error: string;
+  onRetry: () => void;
+  status: TrendingStatus;
+}) {
+  const pools = data?.pools ?? [];
+  const isLoading = status === "loading" || status === "idle";
+
+  return (
+    <section className="trending-page" aria-label="Trending Base Pools">
+      <div className="trending-hero">
+        <div>
+          <p className="section-kicker">Trending by market activity</p>
+          <h1>Trending Base Pools</h1>
+          <p>Pools currently trending by market activity and GeckoTerminal signals.</p>
+        </div>
+        <div className="trending-meta">
+          <span>{data?.updatedAt ? `Last updated ${historyTimestampText(data.updatedAt)}` : "Last updated unavailable"}</span>
+          <span>Data by GeckoTerminal</span>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="panel trending-state">
+          <Loader2 className="spin" size={24} />
+          <strong>Loading trending Base pools</strong>
+          <span>Fetching market activity from the server-side GeckoTerminal API route.</span>
+        </div>
+      ) : status === "error" ? (
+        <div className="panel trending-state error-state">
+          <AlertTriangle size={24} />
+          <strong>Provider error</strong>
+          <span>{error || "GeckoTerminal trending pools could not be loaded."}</span>
+          <button type="button" onClick={onRetry}>
+            <RefreshCw size={16} />
+            Retry
+          </button>
+        </div>
+      ) : pools.length ? (
+        <div className="trending-list">
+          {pools.map((pool, index) => (
+            <article className="trending-pool" key={`${pool.id}-${index}`}>
+              <div className="trending-rank">{index + 1}</div>
+              <div className="trending-main">
+                <div className="trending-title">
+                  <strong>{pool.pairName}</strong>
+                  <span>{pool.dexName}</span>
+                </div>
+                <div className="trending-tokens">
+                  <span>
+                    <b>{trendingTokenLabel(pool.baseToken)}</b>
+                    <small title={pool.baseToken.address}>{pool.baseToken.address ?? "No contract address"}</small>
+                  </span>
+                  <span>
+                    <b>{trendingTokenLabel(pool.quoteToken)}</b>
+                    <small title={pool.quoteToken.address}>{pool.quoteToken.address ?? "No contract address"}</small>
+                  </span>
+                </div>
+              </div>
+
+              <dl className="trending-metrics">
+                <div>
+                  <dt>Price</dt>
+                  <dd>{pool.priceUsd ? currency(Number(pool.priceUsd)) : "Unavailable"}</dd>
+                </div>
+                <div>
+                  <dt>24h change</dt>
+                  <dd>{percentText(pool.priceChangeH24)}</dd>
+                </div>
+                <div>
+                  <dt>24h volume</dt>
+                  <dd>{currency(pool.volumeH24Usd, true)}</dd>
+                </div>
+                <div>
+                  <dt>Liquidity</dt>
+                  <dd>{currency(pool.liquidityUsd, true)}</dd>
+                </div>
+                <div>
+                  <dt>24h buys</dt>
+                  <dd>{numberText(pool.buysH24)}</dd>
+                </div>
+                <div>
+                  <dt>24h sells</dt>
+                  <dd>{numberText(pool.sellsH24)}</dd>
+                </div>
+                <div>
+                  <dt>Pool age</dt>
+                  <dd>{pairAgeText(pool.poolCreatedAt)}</dd>
+                </div>
+              </dl>
+
+              <div className="trending-actions">
+                {trendingTokenScanChoices(pool).length ? (
+                  trendingTokenScanChoices(pool).map((token) => (
+                    <a className="snapshot-action" href={`/token/${token.address}`} key={`${pool.id}-${token.side}`}>
+                      <ScanLine size={15} />
+                      Scan {trendingTokenLabel(token)}
+                    </a>
+                  ))
+                ) : (
+                  <span className="snapshot-action disabled">No scannable token</span>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="panel trending-state">
+          <Search size={24} />
+          <strong>No trending pools returned</strong>
+          <span>GeckoTerminal returned no Base pools for this request.</span>
+        </div>
+      )}
+    </section>
   );
 }
 
