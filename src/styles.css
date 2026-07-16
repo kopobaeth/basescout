@@ -57,6 +57,7 @@ span.disabled {
 .brand,
 .network-pill,
 .topbar-actions,
+.nav-link,
 .header-x-link {
   display: inline-flex;
   align-items: center;
@@ -88,34 +89,41 @@ span.disabled {
 .topbar-actions {
   justify-content: flex-end;
   min-width: 0;
+  gap: 10px;
 }
 
 .network-pill {
-  min-height: 34px;
-  padding: 0 12px;
-  color: #253145;
-  background: #ffffff;
-  border: 1px solid var(--line);
+  min-height: 30px;
+  margin-left: 8px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: #f8fbff;
+  border: 1px solid #e5edf8;
   border-radius: 8px;
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 650;
   white-space: nowrap;
 }
 
+.nav-link,
 .header-x-link {
-  min-height: 34px;
-  padding: 0 10px;
-  color: var(--ink);
+  min-height: 38px;
+  padding: 0 16px;
   background: #ffffff;
-  border: 1px solid transparent;
   border-radius: 8px;
-  font-size: 1.02rem;
-  font-weight: 750;
+  font-size: 0.95rem;
+  font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
   transition:
     background 0.16s ease,
-    border-color 0.16s ease;
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.header-x-link {
+  color: var(--ink);
+  border: 1px solid transparent;
 }
 
 .header-x-link:hover {
@@ -124,18 +132,8 @@ span.disabled {
 }
 
 .nav-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 11px;
-  color: #253145;
-  background: #ffffff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 0.86rem;
-  font-weight: 750;
-  text-decoration: none;
-  white-space: nowrap;
+  color: var(--base-blue);
+  border: 1px solid rgba(0, 82, 255, 0.24);
 }
 
 .nav-link:hover,
@@ -1643,9 +1641,18 @@ h2 {
     flex-wrap: wrap;
   }
 
-  .nav-link {
+  .nav-link,
+  .header-x-link {
     min-height: 32px;
     padding: 0 9px;
+    font-size: 0.84rem;
+  }
+
+  .network-pill {
+    min-height: 30px;
+    margin-left: 0;
+    padding: 0 9px;
+    font-size: 0.76rem;
   }
 
   .brand-mark {

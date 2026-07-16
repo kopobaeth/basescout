@@ -1546,14 +1546,14 @@ function App() {
           <a className={`nav-link ${isTrendingPage ? "active" : ""}`} href="/trending" onClick={handleTrendingNav}>
             Trending
           </a>
+          <a className="header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
+            <X size={16} />
+            <span>Updates on X</span>
+          </a>
           <div className="network-pill">
             <span className="status-dot" />
             Base mainnet
           </div>
-          <a className="header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Follow on X">
-            <X size={16} />
-            <span>X</span>
-          </a>
         </div>
       </nav>
       <p className="data-note">Data from DEX Screener and BaseScan.</p>
