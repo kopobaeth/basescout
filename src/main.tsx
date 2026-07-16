@@ -184,6 +184,10 @@ function trendingPageUrl() {
   return new URL(trendingPath(), window.location.origin).toString();
 }
 
+function homePageUrl() {
+  return new URL("/", window.location.origin).toString();
+}
+
 function isTrendingPath(pathname = window.location.pathname) {
   return pathname === trendingPath();
 }
@@ -1453,6 +1457,15 @@ function App() {
     setTrendingMetadata();
   }
 
+  function handleScanNav(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
+      window.history.pushState({}, "", homePageUrl());
+    }
+    setRoutePath("/");
+    restoreHomeMetadata();
+  }
+
   function rescanHistoryItem(item: ScanHistoryItem) {
     if (isLoading) return;
     void scanToken(item.address, { source: "history", symbol: item.symbol });
@@ -1543,9 +1556,15 @@ function App() {
           <span>BaseScout</span>
         </div>
         <div className="topbar-actions">
-          <a className={`header-action-button nav-link ${isTrendingPage ? "active" : ""}`} href="/trending" onClick={handleTrendingNav}>
-            Trending
-          </a>
+          {isTrendingPage ? (
+            <a className="header-action-button nav-link" href="/" onClick={handleScanNav}>
+              Scan
+            </a>
+          ) : (
+            <a className="header-action-button nav-link" href="/trending" onClick={handleTrendingNav}>
+              Trending
+            </a>
+          )}
           <a className="header-action-button header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
             <X size={16} />
             <span>Updates on X</span>
