@@ -1298,41 +1298,28 @@ function App() {
   }
 
   return (
-    <>
-      <a
-        className="promo-bar"
-        href="https://launch.o1.exchange/token/0xb2000000000000000000000ee9988edd75453501"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <span className="promo-content">
-          <span className="promo-badge">LIVE</span>
-          <span>The Base Cat $PAMPU is live</span>
-          <ExternalLink size={15} />
-        </span>
-      </a>
-      <main className="shell">
-        <nav className="topbar" aria-label="Primary navigation">
-          <div className="brand">
-            <span className="brand-mark" aria-hidden="true">
-              <img src="/basescout-logo.png?v=2" alt="" width="32" height="32" />
-            </span>
-            <span>BaseScout</span>
+    <main className="shell">
+      <nav className="topbar" aria-label="Primary navigation">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            <img src="/basescout-logo.png?v=2" alt="" width="32" height="32" />
+          </span>
+          <span>BaseScout</span>
+        </div>
+        <div className="topbar-actions">
+          <div className="network-pill">
+            <span className="status-dot" />
+            Base mainnet
           </div>
-          <div className="topbar-actions">
-            <div className="network-pill">
-              <span className="status-dot" />
-              Base mainnet
-            </div>
-            <a className="header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Follow on X">
-              <X size={16} />
-              <span>X</span>
-            </a>
-          </div>
-        </nav>
-        <p className="data-note">Data from DEX Screener and BaseScan.</p>
+          <a className="header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Follow on X">
+            <X size={16} />
+            <span>X</span>
+          </a>
+        </div>
+      </nav>
+      <p className="data-note">Data from DEX Screener and BaseScan.</p>
 
-        <section className="hero">
+      <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">Base token risk scanner</p>
           <h1>Scan the token. Read the risk. Then decide.</h1>
@@ -1684,8 +1671,7 @@ function App() {
         <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
         <span>Not financial advice.</span>
       </footer>
-      </main>
-    </>
+    </main>
   );
 }
 
