@@ -41,6 +41,7 @@ import {
 } from "./watchlist";
 import { applySecurityContractRisk } from "./riskSecurity";
 import { emptySecurityIntelligence } from "./security";
+import { loadTrendingPools } from "./trendingClient";
 import "./styles.css";
 import type {
   BaseScanIntelligence,
@@ -58,6 +59,7 @@ import type {
   SecurityIntelligence,
   TrendingApiResponse,
   TrendingPool,
+  TrendingStatus,
   TrendingToken,
   WatchlistItem
 } from "./types";
@@ -76,8 +78,6 @@ type ScanContext = {
   source: ScanSource;
   symbol?: string;
 };
-
-type TrendingStatus = "idle" | "loading" | "success" | "error";
 
 type ScanErrorView = {
   code: ScanErrorCode;
@@ -280,18 +280,6 @@ function xPostComposerUrl(result: ScanResult, tokenAddress: string) {
   const url = new URL("https://x.com/intent/post");
   url.searchParams.set("text", tokenShareText(result, tokenAddress));
   return url.toString();
-}
-
-function parseTrendingApiResponse(value: unknown): TrendingApiResponse | undefined {
-  if (!isRecord(value) || !Array.isArray(value.pools)) return undefined;
-
-  return {
-    source: value.source === "geckoterminal" ? "geckoterminal" : "geckoterminal",
-    attribution: "Data by GeckoTerminal",
-    updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : Date.now(),
-    cacheSeconds: typeof value.cacheSeconds === "number" ? value.cacheSeconds : 60,
-    pools: value.pools.filter(isRecord).map((pool) => pool as TrendingPool)
-  };
 }
 
 function hasPartialContractIntelligenceFailure(baseScan: BaseScanIntelligence) {
@@ -1169,6 +1157,7 @@ function App() {
   const [trendingStatus, setTrendingStatus] = useState<TrendingStatus>("idle");
   const [trendingError, setTrendingError] = useState("");
   const [trendingData, setTrendingData] = useState<TrendingApiResponse | null>(null);
+  const [trendingReloadKey, setTrendingReloadKey] = useState(0);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>(() => readScanHistory());
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => readWatchlist());
   const activeRequestRef = useRef<AbortController | null>(null);
@@ -1296,40 +1285,19 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isTrendingPage || trendingStatus !== "idle") return;
+    if (!isTrendingPage) return;
 
     const controller = new AbortController();
 
-    async function loadTrendingPools() {
-      setTrendingStatus("loading");
-      setTrendingError("");
+    void loadTrendingPools({
+      setData: setTrendingData,
+      setError: setTrendingError,
+      setStatus: setTrendingStatus,
+      signal: controller.signal
+    });
 
-      try {
-        const response = await fetch("/api/trending", {
-          signal: controller.signal
-        });
-        const contentType = response.headers.get("content-type") ?? "";
-        const json = contentType.includes("application/json") ? await response.json().catch(() => undefined) : undefined;
-
-        if (!response.ok) {
-          const providerMessage = isRecord(json) ? stringValue(json.error) : undefined;
-          throw new Error(providerMessage ?? "GeckoTerminal trending pools could not be loaded.");
-        }
-
-        const payload = parseTrendingApiResponse(json);
-        setTrendingData(payload ?? null);
-        setTrendingStatus("success");
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") return;
-        setTrendingData(null);
-        setTrendingStatus("error");
-        setTrendingError(error instanceof Error ? error.message : "GeckoTerminal trending pools could not be loaded.");
-      }
-    }
-
-    void loadTrendingPools();
     return () => controller.abort();
-  }, [isTrendingPage, trendingStatus]);
+  }, [isTrendingPage, trendingReloadKey]);
 
   function resetForInput(nextAddress: string) {
     setAddress(nextAddress);
@@ -1594,7 +1562,7 @@ function App() {
         <TrendingPage
           data={trendingData}
           error={trendingError}
-          onRetry={() => setTrendingStatus("idle")}
+          onRetry={() => setTrendingReloadKey((key) => key + 1)}
           status={trendingStatus}
         />
       ) : (

@@ -5,6 +5,8 @@ import handler, {
   providerErrorPayload,
   selectScannableTokens
 } from "../api/trending";
+import { loadTrendingPools } from "./trendingClient";
+import type { TrendingApiResponse, TrendingStatus } from "./types";
 
 const sampleResponse = {
   data: [
@@ -153,3 +155,69 @@ assert.equal(JSON.parse(response.body).errorCode, "provider_error");
 
 globalThis.fetch = originalFetch;
 console.error = originalConsoleError;
+
+function transitionHandlers(statuses: TrendingStatus[]) {
+  let data: TrendingApiResponse | null = null;
+  let error = "";
+
+  return {
+    handlers: {
+      setData(nextData: TrendingApiResponse | null) {
+        data = nextData;
+      },
+      setError(nextError: string) {
+        error = nextError;
+      },
+      setStatus(nextStatus: TrendingStatus) {
+        statuses.push(nextStatus);
+      }
+    },
+    getData() {
+      return data;
+    },
+    getError() {
+      return error;
+    }
+  };
+}
+
+const successStatuses: TrendingStatus[] = [];
+const success = transitionHandlers(successStatuses);
+await loadTrendingPools({
+  ...success.handlers,
+  fetcher: async () =>
+    new Response(
+      JSON.stringify({
+        source: "geckoterminal",
+        attribution: "Data by GeckoTerminal",
+        updatedAt: 123,
+        cacheSeconds: 60,
+        pools: []
+      }),
+      {
+        headers: { "content-type": "application/json" },
+        status: 200
+      }
+    ),
+  signal: new AbortController().signal,
+  timeoutMs: 1000
+});
+assert.deepEqual(successStatuses, ["loading", "success"]);
+assert.equal(success.getData()?.updatedAt, 123);
+assert.equal(success.getError(), "");
+
+const errorStatuses: TrendingStatus[] = [];
+const failure = transitionHandlers(errorStatuses);
+await loadTrendingPools({
+  ...failure.handlers,
+  fetcher: async () =>
+    new Response("not json", {
+      headers: { "content-type": "application/json" },
+      status: 200
+    }),
+  signal: new AbortController().signal,
+  timeoutMs: 1000
+});
+assert.deepEqual(errorStatuses, ["loading", "error"]);
+assert.equal(failure.getData(), null);
+assert.match(failure.getError(), /invalid|JSON|Unexpected/i);

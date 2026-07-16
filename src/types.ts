@@ -190,6 +190,8 @@ export type WatchlistItem = {
   lastScannedAt: number;
 };
 
+export type TrendingStatus = "idle" | "loading" | "success" | "error";
+
 export type TrendingTokenSide = "base" | "quote";
 
 export type TrendingToken = {
