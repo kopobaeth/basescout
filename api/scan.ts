@@ -1,7 +1,4 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isTokenContractAddress, ZERO_ADDRESS } from "../src/tokenAddress";
-
-export { isTokenContractAddress };
 
 type DexToken = {
   address?: string;
@@ -134,6 +131,8 @@ type DexResponse = {
   pairs?: DexPair[] | null;
 };
 
+const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const BASE_CHAIN_ID = "8453";
 const ETHERSCAN_API_URL = "https://api.etherscan.io/v2/api";
 const GOPLUS_TOKEN_SECURITY_URL = "https://api.gopluslabs.io/api/v1/token_security/8453";
@@ -198,6 +197,10 @@ function sameAddress(a?: string, b?: string) {
 
 function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
+}
+
+export function isTokenContractAddress(value: string) {
+  return ADDRESS_PATTERN.test(value) && value.toLowerCase() !== ZERO_ADDRESS;
 }
 
 export function providerTimeoutWithinDeadline(deadlineAt: number, maximumTimeoutMs: number, now = Date.now()) {

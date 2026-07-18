@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import scanHandler, {
   cacheControlForScanStatus,
   isTokenContractAddress as isApiTokenContractAddress,
@@ -9,6 +10,11 @@ import { ScanRequestCoordinator } from "./scanRequestCoordinator";
 import { isEvmAddress, isTokenContractAddress, ZERO_ADDRESS } from "./tokenAddress";
 
 const tokenAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+for (const entrypoint of ["../api/scan.ts", "../api/trending.ts"]) {
+  const source = readFileSync(new URL(entrypoint, import.meta.url), "utf8");
+  assert.doesNotMatch(source, /from\s+["']\.\.\/src\//);
+}
 
 assert.equal(isEvmAddress(ZERO_ADDRESS), true);
 assert.equal(isTokenContractAddress(ZERO_ADDRESS), false);
