@@ -178,7 +178,7 @@ export function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: st
   checks.push(
     sellTax === undefined
       ? unknownFinding("sell_tax", "Sell tax", "Sell tax unknown")
-      : finding("sell_tax", "Sell tax", sellTax >= 100 ? "critical" : sellTax > 10 ? "critical" : "pass", `Sell tax: ${percentText(sellTax)}`, sellTax >= 100 ? "A 100% sell tax can make selling economically impossible. Evidence: confirmed by provider response." : sellTax > 10 ? "Sell tax above 10% materially reduces exits and can indicate hostile token mechanics. Evidence: confirmed by provider response." : "Sell tax is not above the 10% high-tax threshold. Evidence: confirmed by provider response.", "confirmed", percentText(sellTax))
+      : finding("sell_tax", "Sell tax", sellTax >= 100 ? "critical" : sellTax > 10 ? "warning" : "pass", `Sell tax: ${percentText(sellTax)}`, sellTax >= 100 ? "A 100% sell tax can make selling economically impossible. Evidence: confirmed by provider response." : sellTax > 10 ? "Sell tax above 10% materially reduces exits and can indicate hostile token mechanics. Evidence: confirmed by provider response." : "Sell tax is not above the 10% high-tax threshold. Evidence: confirmed by provider response.", "confirmed", percentText(sellTax))
   );
 
   checks.push(
@@ -191,7 +191,7 @@ export function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: st
     mintable === undefined
       ? unknownFinding("owner_can_mint", "Owner can mint", "Mint capability unknown")
       : mintable
-        ? finding("owner_can_mint", "Owner can mint", "critical", "Owner can mint", "Mint authority can inflate supply and dilute holders. Evidence: confirmed by provider response.", "confirmed")
+        ? finding("owner_can_mint", "Owner can mint", "warning", "Owner can mint", "Mint authority can inflate supply and dilute holders. Evidence: confirmed by provider response.", "confirmed")
         : finding("owner_can_mint", "Owner can mint", "pass", "No owner mint capability detected", "Provider did not flag mint authority. Evidence: confirmed by provider response.", "confirmed")
   );
 
@@ -199,7 +199,7 @@ export function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: st
     blacklist === undefined
       ? unknownFinding("blacklist", "Blacklist capability", "Blacklist capability unknown")
       : blacklist
-        ? finding("blacklist", "Blacklist capability", "critical", "Blacklist capability enabled", "Blacklist controls can block selected wallets from transferring or selling. Evidence: confirmed by provider response.", "confirmed")
+        ? finding("blacklist", "Blacklist capability", "warning", "Blacklist capability enabled", "Blacklist controls can block selected wallets from transferring or selling. Evidence: confirmed by provider response.", "confirmed")
         : finding("blacklist", "Blacklist capability", "pass", "No blacklist capability detected", "Provider did not flag blacklist controls. Evidence: confirmed by provider response.", "confirmed")
   );
 
@@ -245,7 +245,7 @@ export function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: st
 
   checks.push(
     ownerPrivileged
-      ? finding("owner_privileges", "Owner privileges", "critical", "Owner privileges detected", "Owner-only controls can alter balances, regain ownership, or hide control paths. Evidence: inferred from provider owner privilege fields.", "inferred")
+      ? finding("owner_privileges", "Owner privileges", "warning", "Owner privileges detected", "Owner-only controls can alter balances, regain ownership, or hide control paths. Evidence: inferred from provider owner privilege fields.", "inferred")
       : [hiddenOwner, takeBackOwnership, ownerModifiesBalance].every((value) => value === false)
         ? finding("owner_privileges", "Owner privileges", "pass", "No high-risk owner privileges detected", "Provider did not flag hidden owner, ownership recovery, or owner balance changes. Evidence: inferred from provider owner privilege fields.", "inferred")
         : unknownFinding("owner_privileges", "Owner privileges", "Owner privilege status unknown")

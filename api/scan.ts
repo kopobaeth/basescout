@@ -397,7 +397,7 @@ function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): 
       : securityFinding(
           "sell_tax",
           "Sell tax",
-          sellTax >= 100 ? "critical" : sellTax > 10 ? "critical" : "pass",
+          sellTax >= 100 ? "critical" : sellTax > 10 ? "warning" : "pass",
           `Sell tax: ${securityPercentText(sellTax)}`,
           sellTax >= 100
             ? "A 100% sell tax can make selling economically impossible. Evidence: confirmed by provider response."
@@ -432,7 +432,7 @@ function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): 
         ? securityFinding(
             "owner_can_mint",
             "Owner can mint",
-            "critical",
+            "warning",
             "Owner can mint",
             "Mint authority can inflate supply and dilute holders. Evidence: confirmed by provider response.",
             "confirmed"
@@ -454,7 +454,7 @@ function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): 
         ? securityFinding(
             "blacklist",
             "Blacklist capability",
-            "critical",
+            "warning",
             "Blacklist capability enabled",
             "Blacklist controls can block selected wallets from transferring or selling. Evidence: confirmed by provider response.",
             "confirmed"
@@ -584,7 +584,7 @@ function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): 
       ? securityFinding(
           "owner_privileges",
           "Owner privileges",
-          "critical",
+          "warning",
           "Owner privileges detected",
           "Owner-only controls can alter balances, regain ownership, or hide control paths. Evidence: inferred from provider owner privilege fields.",
           "inferred"
