@@ -162,11 +162,11 @@ export function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: st
   const ownerPrivileged = [hiddenOwner, takeBackOwnership, ownerModifiesBalance].some(Boolean);
 
   checks.push(
-    honeypot === undefined
-      ? unknownFinding("honeypot", "Honeypot status", "Honeypot status unknown")
-      : honeypot || cannotSell
-        ? finding("honeypot", "Honeypot status", "critical", cannotSell ? "Cannot sell detected" : "Honeypot detected", "Provider reports that selling may be blocked. This matters because holders may be unable to exit a position. Evidence: confirmed by provider response.", "confirmed")
-        : finding("honeypot", "Honeypot status", "pass", "No honeypot detected", "Provider did not flag honeypot behavior. This lowers this specific risk signal only; it is not a guarantee of safety. Evidence: confirmed by provider response.", "confirmed")
+    honeypot === true || cannotSell === true
+      ? finding("honeypot", "Honeypot status", "critical", cannotSell ? "Cannot sell detected" : "Honeypot detected", "Provider reports that selling may be blocked. This matters because holders may be unable to exit a position. Evidence: confirmed by provider response.", "confirmed")
+      : honeypot === false
+        ? finding("honeypot", "Honeypot status", "pass", "No honeypot detected", "Provider did not flag honeypot behavior. This lowers this specific risk signal only; it is not a guarantee of safety. Evidence: confirmed by provider response.", "confirmed")
+        : unknownFinding("honeypot", "Honeypot status", "Honeypot status unknown")
   );
 
   checks.push(

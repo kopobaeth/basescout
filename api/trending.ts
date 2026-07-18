@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isTokenContractAddress } from "../src/tokenAddress";
 
 type GeckoResource = {
   id?: string;
@@ -56,7 +57,8 @@ const GECKO_ACCEPT_HEADER = "application/json;version=20230203";
 const TRENDING_CACHE_MS = 60_000;
 const TRENDING_TIMEOUT_MS = 10_000;
 const MAX_TRENDING_POOLS = 20;
-const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+const SUCCESS_CACHE_CONTROL = "public, max-age=0, s-maxage=60, stale-while-revalidate=120";
+const ERROR_CACHE_CONTROL = "private, no-store";
 
 let trendingCache: { expiresAt: number; value: TrendingApiResponse } | undefined;
 
@@ -97,6 +99,10 @@ function timestampValue(value: unknown) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+export function isScannableTokenAddress(value: string) {
+  return isTokenContractAddress(value);
+}
+
 function relationKey(resource: GeckoResource, relationName: string) {
   const data = resource.relationships?.[relationName]?.data;
   if (!data?.type || !data.id) return undefined;
@@ -124,7 +130,7 @@ function tokenFromResource(side: TrendingTokenSide, resource: GeckoResource | un
     name: stringValue(resource?.attributes?.name),
     symbol: stringValue(resource?.attributes?.symbol),
     address,
-    scannable: Boolean(address && ADDRESS_PATTERN.test(address))
+    scannable: Boolean(address && isScannableTokenAddress(address))
   };
 }
 
@@ -236,9 +242,13 @@ async function getTrendingResponse() {
   return value;
 }
 
+export function cacheControlForTrendingStatus(status: number) {
+  return status >= 200 && status < 300 ? SUCCESS_CACHE_CONTROL : ERROR_CACHE_CONTROL;
+}
+
 function sendJson(response: ServerResponse, status: number, payload: TrendingApiResponse | ErrorPayload) {
   response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "public, max-age=0, s-maxage=60, stale-while-revalidate=120");
+  response.setHeader("Cache-Control", cacheControlForTrendingStatus(status));
   response.statusCode = status;
   response.end(JSON.stringify(payload));
 }

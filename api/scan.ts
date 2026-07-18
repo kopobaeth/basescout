@@ -1,4 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isTokenContractAddress, ZERO_ADDRESS } from "../src/tokenAddress";
+
+export { isTokenContractAddress };
 
 type DexToken = {
   address?: string;
@@ -131,7 +134,6 @@ type DexResponse = {
   pairs?: DexPair[] | null;
 };
 
-const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const BASE_CHAIN_ID = "8453";
 const ETHERSCAN_API_URL = "https://api.etherscan.io/v2/api";
 const GOPLUS_TOKEN_SECURITY_URL = "https://api.gopluslabs.io/api/v1/token_security/8453";
@@ -139,6 +141,9 @@ const DEX_TIMEOUT_MS = 10_000;
 const ETHERSCAN_TIMEOUT_MS = 8_000;
 const SECURITY_TIMEOUT_MS = 7_000;
 const SECURITY_CACHE_MS = 90_000;
+export const SCAN_DEADLINE_MS = 12_000;
+const SUCCESS_CACHE_CONTROL = "public, max-age=0, s-maxage=120, stale-while-revalidate=60";
+const ERROR_CACHE_CONTROL = "private, no-store";
 
 const securityCache = new Map<string, { expiresAt: number; value: SecurityIntelligence }>();
 
@@ -195,7 +200,16 @@ function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
 }
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+export function providerTimeoutWithinDeadline(deadlineAt: number, maximumTimeoutMs: number, now = Date.now()) {
+  return Math.max(0, Math.min(maximumTimeoutMs, deadlineAt - now));
+}
+
+function providerTimeoutOrThrow(deadlineAt: number, maximumTimeoutMs: number, label: string) {
+  const timeoutMs = providerTimeoutWithinDeadline(deadlineAt, maximumTimeoutMs);
+  if (timeoutMs <= 0) throw new ScanApiError(`${label} request timed out`);
+  return timeoutMs;
+}
+
 const DEAD_ADDRESS = "0x000000000000000000000000000000000000dead";
 
 const SECURITY_CHECK_KEYS: SecurityCheckKey[] = [
@@ -317,7 +331,7 @@ function emptySecurityIntelligence(note = "Security data unavailable. Market and
   };
 }
 
-function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): SecurityIntelligence {
+export function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): SecurityIntelligence {
   if (!isRecord(value) || !isRecord(value.result)) {
     return emptySecurityIntelligence("Security provider returned an invalid response.");
   }
@@ -354,18 +368,17 @@ function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): 
   const ownerPrivileged = [hiddenOwner, takeBackOwnership, ownerModifiesBalance].some(Boolean);
 
   checks.push(
-    honeypot === undefined
-      ? unknownSecurityFinding("honeypot", "Honeypot status", "Honeypot status unknown")
-      : honeypot || cannotSell
+    honeypot === true || cannotSell === true
+      ? securityFinding(
+          "honeypot",
+          "Honeypot status",
+          "critical",
+          cannotSell ? "Cannot sell detected" : "Honeypot detected",
+          "Provider reports that selling may be blocked. This matters because holders may be unable to exit a position. Evidence: confirmed by provider response.",
+          "confirmed"
+        )
+      : honeypot === false
         ? securityFinding(
-            "honeypot",
-            "Honeypot status",
-            "critical",
-            cannotSell ? "Cannot sell detected" : "Honeypot detected",
-            "Provider reports that selling may be blocked. This matters because holders may be unable to exit a position. Evidence: confirmed by provider response.",
-            "confirmed"
-          )
-        : securityFinding(
             "honeypot",
             "Honeypot status",
             "pass",
@@ -373,6 +386,7 @@ function normalizeGoPlusSecurityResponse(value: unknown, tokenAddress: string): 
             "Provider did not flag honeypot behavior. This lowers this specific risk signal only; it is not a guarantee of safety. Evidence: confirmed by provider response.",
             "confirmed"
           )
+        : unknownSecurityFinding("honeypot", "Honeypot status", "Honeypot status unknown")
   );
 
   checks.push(
@@ -755,7 +769,8 @@ function normalizeBasePairs(pairs: DexPair[], tokenAddress: string) {
   return normalized.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
 }
 
-async function fetchJson(url: URL | string, timeoutMs: number, label: string) {
+async function fetchJson(url: URL | string, maximumTimeoutMs: number, label: string, deadlineAt: number) {
+  const timeoutMs = providerTimeoutOrThrow(deadlineAt, maximumTimeoutMs, label);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -780,16 +795,17 @@ async function fetchJson(url: URL | string, timeoutMs: number, label: string) {
   }
 }
 
-async function fetchDexPairs(tokenAddress: string) {
+async function fetchDexPairs(tokenAddress: string, deadlineAt: number) {
   const url = `https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(tokenAddress)}`;
-  const json = await fetchJson(url, DEX_TIMEOUT_MS, "DEX Screener");
+  const json = await fetchJson(url, DEX_TIMEOUT_MS, "DEX Screener", deadlineAt);
   const pairs = parseDexResponse(json).pairs ?? [];
   return normalizeBasePairs(pairs, tokenAddress);
 }
 
-async function fetchSecurityJson(tokenAddress: string) {
+async function fetchSecurityJson(tokenAddress: string, deadlineAt: number) {
+  const timeoutMs = providerTimeoutOrThrow(deadlineAt, SECURITY_TIMEOUT_MS, "GoPlus");
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), SECURITY_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const url = new URL(GOPLUS_TOKEN_SECURITY_URL);
   url.searchParams.set("contract_addresses", tokenAddress);
 
@@ -818,13 +834,13 @@ async function fetchSecurityJson(tokenAddress: string) {
   }
 }
 
-async function fetchSecurityIntelligence(tokenAddress: string) {
+async function fetchSecurityIntelligence(tokenAddress: string, deadlineAt: number) {
   const cacheKey = tokenAddress.toLowerCase();
   const cached = securityCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   try {
-    const json = await fetchSecurityJson(tokenAddress);
+    const json = await fetchSecurityJson(tokenAddress, deadlineAt);
     const value = normalizeGoPlusSecurityResponse(json, tokenAddress);
     securityCache.set(cacheKey, { expiresAt: Date.now() + SECURITY_CACHE_MS, value });
     return value;
@@ -908,14 +924,19 @@ function buildEtherscanApiUrl(params: Record<string, string>) {
   return url;
 }
 
-async function fetchEtherscanJson(params: Record<string, string>) {
+async function fetchEtherscanJson(params: Record<string, string>, deadlineAt: number) {
   const endpoint = etherscanEndpointName(params);
   if (!process.env.ETHERSCAN_API_KEY?.trim()) {
     throw new EtherscanApiError("missing-key", endpoint, "Missing ETHERSCAN_API_KEY");
   }
 
   try {
-    const json = await fetchJson(buildEtherscanApiUrl(params), ETHERSCAN_TIMEOUT_MS, `Etherscan ${endpoint}`);
+    const json = await fetchJson(
+      buildEtherscanApiUrl(params),
+      ETHERSCAN_TIMEOUT_MS,
+      `Etherscan ${endpoint}`,
+      deadlineAt
+    );
     const reason = getEtherscanErrorReason(json);
     if (reason) {
       const message = etherscanMessage(json);
@@ -940,25 +961,31 @@ function rejectedEtherscanReason(result: PromiseSettledResult<unknown>): BaseSca
     : undefined;
 }
 
-async function fetchCreationTimestamp(txHash: string | undefined) {
+async function fetchCreationTimestamp(txHash: string | undefined, deadlineAt: number) {
   if (!txHash) return undefined;
 
   try {
-    const txJson = await fetchEtherscanJson({
-      module: "proxy",
-      action: "eth_getTransactionByHash",
-      txhash: txHash
-    });
+    const txJson = await fetchEtherscanJson(
+      {
+        module: "proxy",
+        action: "eth_getTransactionByHash",
+        txhash: txHash
+      },
+      deadlineAt
+    );
     const txResult = isRecord(txJson) && isRecord(txJson.result) ? txJson.result : undefined;
     const blockNumber = stringValue(txResult?.blockNumber);
     if (!blockNumber) return undefined;
 
-    const blockJson = await fetchEtherscanJson({
-      module: "proxy",
-      action: "eth_getBlockByNumber",
-      tag: blockNumber,
-      boolean: "false"
-    });
+    const blockJson = await fetchEtherscanJson(
+      {
+        module: "proxy",
+        action: "eth_getBlockByNumber",
+        tag: blockNumber,
+        boolean: "false"
+      },
+      deadlineAt
+    );
     const blockResult = isRecord(blockJson) && isRecord(blockJson.result) ? blockJson.result : undefined;
     const timestamp = parseHexInteger(blockResult?.timestamp);
     return timestamp ? timestamp * 1000 : undefined;
@@ -969,16 +996,19 @@ async function fetchCreationTimestamp(txHash: string | undefined) {
   }
 }
 
-async function fetchBaseScanIntelligence(tokenAddress: string): Promise<BaseScanIntelligence> {
+async function fetchBaseScanIntelligence(tokenAddress: string, deadlineAt: number): Promise<BaseScanIntelligence> {
   if (!process.env.ETHERSCAN_API_KEY?.trim()) {
     return emptyBaseScanIntelligence("unavailable", "missing-key");
   }
 
   const [sourceResult, creationResult, supplyResult, holderResult] = await Promise.allSettled([
-    fetchEtherscanJson({ module: "contract", action: "getsourcecode", address: tokenAddress }),
-    fetchEtherscanJson({ module: "contract", action: "getcontractcreation", contractaddresses: tokenAddress }),
-    fetchEtherscanJson({ module: "stats", action: "tokensupply", contractaddress: tokenAddress }),
-    fetchEtherscanJson({ module: "token", action: "tokenholdercount", contractaddress: tokenAddress })
+    fetchEtherscanJson({ module: "contract", action: "getsourcecode", address: tokenAddress }, deadlineAt),
+    fetchEtherscanJson(
+      { module: "contract", action: "getcontractcreation", contractaddresses: tokenAddress },
+      deadlineAt
+    ),
+    fetchEtherscanJson({ module: "stats", action: "tokensupply", contractaddress: tokenAddress }, deadlineAt),
+    fetchEtherscanJson({ module: "token", action: "tokenholdercount", contractaddress: tokenAddress }, deadlineAt)
   ]);
 
   const fulfilled = [sourceResult, creationResult, supplyResult, holderResult].filter(
@@ -1000,7 +1030,9 @@ async function fetchBaseScanIntelligence(tokenAddress: string): Promise<BaseScan
   const verified = hasVerifiedSource(sourceRecord);
   const createdAtSeconds = integerFromString(creationRecord?.timestamp);
   const creationTxHash = stringValue(creationRecord?.txHash);
-  const createdAt = createdAtSeconds ? createdAtSeconds * 1000 : await fetchCreationTimestamp(creationTxHash);
+  const createdAt = createdAtSeconds
+    ? createdAtSeconds * 1000
+    : await fetchCreationTimestamp(creationTxHash, deadlineAt);
   const holderCount =
     holderResult.status === "fulfilled" ? integerFromString(parseEtherscanStringResult(holderResult.value)) : undefined;
   const holderUnavailableReason =
@@ -1067,14 +1099,18 @@ function noBasePairMessage() {
   return "No Base pair found for this token. Confirm the contract is deployed on Base and has an indexed DEX pair.";
 }
 
-function withCacheHeaders(response: ServerResponse) {
+export function cacheControlForScanStatus(status: number) {
+  return status >= 200 && status < 300 ? SUCCESS_CACHE_CONTROL : ERROR_CACHE_CONTROL;
+}
+
+function withResponseHeaders(response: ServerResponse, status: number) {
   response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "public, max-age=0, s-maxage=120, stale-while-revalidate=60");
+  response.setHeader("Cache-Control", cacheControlForScanStatus(status));
 }
 
 function sendJson(response: ServerResponse, status: number, payload: ScanApiResponse | { error: string; errorCode?: ScanErrorCode }) {
   try {
-    if (!response.headersSent) withCacheHeaders(response);
+    if (!response.headersSent) withResponseHeaders(response, status);
     response.statusCode = status;
     response.end(JSON.stringify(payload));
   } catch (error) {
@@ -1082,6 +1118,7 @@ function sendJson(response: ServerResponse, status: number, payload: ScanApiResp
     if (response.writableEnded) return;
 
     try {
+      if (!response.headersSent) withResponseHeaders(response, 500);
       response.statusCode = 500;
       response.end(
         JSON.stringify({
@@ -1110,18 +1147,19 @@ export default async function handler(request: IncomingMessage, response: Server
     const url = requestUrl(request);
     const address = url.searchParams.get("address")?.trim() ?? "";
 
-    if (!ADDRESS_PATTERN.test(address)) {
+    if (!isTokenContractAddress(address)) {
       sendJson(response, 400, {
-        error: "Invalid address. Enter a 0x token contract with 40 hexadecimal characters.",
+        error: "Invalid address. Enter a non-zero 0x token contract with 40 hexadecimal characters.",
         errorCode: "invalid_address"
       });
       return;
     }
 
+    const deadlineAt = Date.now() + SCAN_DEADLINE_MS;
     const [dexResult, baseScanResult, securityResult] = await Promise.allSettled([
-      fetchDexPairs(address),
-      fetchBaseScanIntelligence(address),
-      fetchSecurityIntelligence(address)
+      fetchDexPairs(address, deadlineAt),
+      fetchBaseScanIntelligence(address, deadlineAt),
+      fetchSecurityIntelligence(address, deadlineAt)
     ]);
     const baseScan =
       baseScanResult.status === "fulfilled"

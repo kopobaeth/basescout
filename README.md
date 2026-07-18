@@ -105,6 +105,14 @@ Confidence:
 
 Missing data is never treated as automatically safe or as a confirmed negative signal. When coverage is too low to support a lower or moderate rating, BaseScout shows `Insufficient data`.
 
+## Reliability Boundaries
+
+- The browser gives a scan up to 15 seconds; the server caps all provider work to a shared 12-second deadline.
+- Starting a new scan aborts the previous request, and navigating to Home or Trending invalidates any in-flight scan result.
+- Native assets and the zero address are not accepted as token contracts. Trending can still show a native side, but only contract-backed sides are scannable.
+- Successful API responses may use short shared-cache windows. Validation, provider, and server errors use `private, no-store` so transient failures are not replayed from shared caches.
+- A confirmed `cannot_sell` provider flag is treated as critical even when the separate honeypot field is missing.
+
 ## Current Limitations
 
 - MVP serverless API; there is no database, queue, or long-lived cache.
@@ -223,6 +231,15 @@ Static hosting:
 - Uploading only `dist` is not enough for v0.4 because `/api/scan` must run on a serverless host.
 
 ## Changelog
+
+### Unreleased
+
+- Added scan request supersession and navigation cancellation to prevent stale results from overwriting the current route
+- Added a shared server-side provider deadline below the browser timeout
+- Rejected zero-address/native assets as token contracts across manual, routed, API, and Trending scan entry points
+- Prevented non-success API responses from being stored in shared caches
+- Fixed `cannot_sell` normalization when the provider omits the honeypot field
+- Added reliability regression tests for request coordination, address policy, deadlines, cache headers, and security normalization
 
 ### v0.7
 

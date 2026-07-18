@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import handler, {
+  cacheControlForTrendingStatus,
   clearTrendingCacheForTests,
+  isScannableTokenAddress,
   normalizeGeckoTrendingResponse,
   providerErrorPayload,
   selectScannableTokens
@@ -122,6 +124,10 @@ const nativeOnlyChoices = selectScannableTokens({
 });
 assert.equal(nativeOnlyChoices.length, 1);
 assert.equal(nativeOnlyChoices[0].symbol, "USDC");
+assert.equal(isScannableTokenAddress("0x0000000000000000000000000000000000000000"), false);
+assert.equal(isScannableTokenAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"), true);
+assert.equal(cacheControlForTrendingStatus(200).startsWith("public"), true);
+assert.equal(cacheControlForTrendingStatus(502), "private, no-store");
 
 assert.deepEqual(providerErrorPayload(new Error("provider unavailable")), {
   error: "Provider error. provider unavailable",
@@ -152,6 +158,7 @@ const response = {
 await handler(request as never, response as never);
 assert.equal(response.statusCode, 502);
 assert.equal(JSON.parse(response.body).errorCode, "provider_error");
+assert.equal(response.headers["Cache-Control"], "private, no-store");
 
 globalThis.fetch = originalFetch;
 console.error = originalConsoleError;
