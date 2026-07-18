@@ -1,5 +1,5 @@
 import { shortAddress } from "./analytics";
-import type { ScanResult, WatchlistItem } from "./types";
+import type { RiskLevel, ScanResult, WatchlistItem } from "./types";
 
 const WATCHLIST_STORAGE_KEY = "basescout:watchlist:v1";
 
@@ -15,6 +15,16 @@ function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function riskLevelValue(value: unknown): RiskLevel | undefined {
+  return value === "lower" ||
+    value === "moderate" ||
+    value === "high" ||
+    value === "critical" ||
+    value === "insufficient"
+    ? value
+    : undefined;
+}
+
 function parseWatchlistItem(value: unknown): WatchlistItem | undefined {
   if (!isRecord(value)) return undefined;
 
@@ -25,6 +35,8 @@ function parseWatchlistItem(value: unknown): WatchlistItem | undefined {
     symbol: stringValue(value.symbol) ?? "UNKNOWN",
     tokenLogo: stringValue(value.tokenLogo),
     lastRiskScore: numberValue(value.lastRiskScore) ?? 0,
+    scoreVersion: stringValue(value.scoreVersion),
+    riskLevel: riskLevelValue(value.riskLevel),
     lastScannedAt: numberValue(value.lastScannedAt) ?? 0
   };
 
@@ -68,6 +80,8 @@ export function buildWatchlistItem(result: ScanResult, tokenAddress: string): Wa
     symbol: result.targetToken.symbol ?? "UNKNOWN",
     tokenLogo: result.pair.info?.imageUrl,
     lastRiskScore: result.score,
+    scoreVersion: result.scoreVersion,
+    riskLevel: result.riskLevel,
     lastScannedAt: Date.now()
   };
 }

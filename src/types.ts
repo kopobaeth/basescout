@@ -65,10 +65,13 @@ export type RiskScoreBreakdown = {
   overall: number;
   market: number;
   contract: number;
+  criticalFloorApplied: boolean;
   confidence: DataConfidence;
   marketReasons: ScoreReason[];
   contractReasons: ScoreReason[];
 };
+
+export type RiskLevel = "lower" | "moderate" | "high" | "critical" | "insufficient";
 
 export type SecurityCheckStatus = "pass" | "warning" | "critical" | "unknown";
 export type SecurityEvidenceLevel = "confirmed" | "inferred" | "unavailable";
@@ -143,7 +146,9 @@ export type ScanResult = {
   targetToken: DexToken;
   baseScan: BaseScanIntelligence;
   security: SecurityIntelligence;
+  scoreVersion: string;
   score: number;
+  riskLevel: RiskLevel;
   verdict: string;
   breakdown: RiskScoreBreakdown;
   findings: Finding[];
@@ -178,6 +183,8 @@ export type ScanHistoryItem = {
   symbol: string;
   timestamp: number;
   riskScore: number;
+  scoreVersion?: string;
+  riskLevel?: RiskLevel;
   tokenLogo?: string;
 };
 
@@ -187,6 +194,8 @@ export type WatchlistItem = {
   symbol: string;
   tokenLogo?: string;
   lastRiskScore: number;
+  scoreVersion?: string;
+  riskLevel?: RiskLevel;
   lastScannedAt: number;
 };
 

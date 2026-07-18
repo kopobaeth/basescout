@@ -39,6 +39,8 @@ Built-in examples:
 
 ## How Risk Score Works
 
+The current scoring contract is Risk Engine `2.0.0`. Scores run from `0` to `100`, where a higher number means more detected risk.
+
 BaseScout shows four score blocks:
 
 - Overall Risk Score
@@ -46,25 +48,25 @@ BaseScout shows four score blocks:
 - Contract Risk
 - Data Confidence
 
-Market and contract scores start at `72` and are clamped between `4` and `96`. The overall score is weighted from market risk, contract risk, and data confidence.
+Market and contract risk start at `28` and are clamped between `0` and `100`. The overall score is weighted from market risk (`55%`) and contract risk (`45%`). Data confidence is reported separately and never changes risk.
 
 DEX Screener factors:
 
 - Liquidity above `$500k`: positive strong-liquidity signal
 - Liquidity `$50k-$500k`: caution signal
-- Liquidity below `$50k`: `-18`
+- Liquidity below `$50k`: `+18` risk
 - Pair age above `30 days`: positive established-pair signal
 - Pair age `3-30 days`: caution signal
-- Pair age below `3 days`: `-18`
+- Pair age below `3 days`: `+18` risk
 - 24h transactions above `1,000`: positive activity signal
 - 24h transactions `100-999`: caution signal
 - 24h transactions below `100`: danger signal
-- Volume/liquidity above `10x`: `-9`
+- Volume/liquidity above `10x`: `+9` risk
 - Market cap or FDV/liquidity above `80x`: danger signal
 - Market cap or FDV/liquidity above `25x`: caution signal
 - Absolute 24h price change above `80%`: danger volatility signal
 - Absolute 24h price change above `30%`: caution volatility signal
-- Missing liquidity, age, transaction, volume, valuation, or volatility data lowers confidence and can reduce market score
+- Missing liquidity, age, transaction, volume, valuation, or volatility data lowers confidence without changing market risk
 
 Optional BaseScan factors:
 
@@ -72,19 +74,19 @@ Optional BaseScan factors:
 - Unverified contract: danger signal
 - Contract age below `3 days`: danger signal
 - Contract age `3-30 days`: caution signal
-- Holder count below `100`: `-12`
-- Holder count `100-1,000`: `-6`
-- Missing verification, deployer, age, supply, or holder count lowers confidence and can reduce contract score
+- Holder count below `100`: `+12` risk
+- Holder count `100-1,000`: `+6` risk
+- Missing verification, deployer, age, supply, or holder count lowers confidence without changing contract risk
 
 Security intelligence factors:
 
-- Confirmed honeypot or cannot-sell finding: critical signal
+- Confirmed honeypot, cannot-sell finding, or blocking `100%` sell tax: critical signal and a minimum `75/100` overall risk
 - Owner can mint: high-risk signal
 - Blacklist capability: high-risk signal
-- Sell tax above `10%`: high-risk signal
+- Sell tax above `10%`: high-risk warning; `100%` is critical
 - Upgradeable proxy: warning signal
 - Trading restrictions, whitelist, pausable transfers, or high transfer/buy taxes: warning signals
-- Verified/open-source contract: positive signal only
+- Verified/open-source contract: positive signal only and counted once across providers
 - Security provider outage or missing fields lowers confidence and does not imply lower risk
 
 Verdicts:
@@ -97,11 +99,11 @@ Verdicts:
 
 Confidence:
 
-- High: most checks completed
-- Medium: meaningful data is present but some checks are missing
-- Low: many checks are unavailable
+- High: at least `75%` of the fixed 25-check registry completed
+- Medium: at least `45%` completed
+- Low: fewer than `45%` completed
 
-Missing data is never treated as automatically safe.
+Missing data is never treated as automatically safe or as a confirmed negative signal. When coverage is too low to support a lower or moderate rating, BaseScout shows `Insufficient data`.
 
 ## Current Limitations
 

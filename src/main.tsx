@@ -39,7 +39,7 @@ import {
   removeWatchlistItem,
   upsertWatchlistItem
 } from "./watchlist";
-import { applySecurityContractRisk } from "./riskSecurity";
+import { calculateRiskReport, RISK_SCORE_VERSION, riskTone } from "./riskEngine";
 import { emptySecurityIntelligence } from "./security";
 import { loadTrendingPools } from "./trendingClient";
 import "./styles.css";
@@ -48,12 +48,11 @@ import type {
   BaseScanStatus,
   BaseScanUnavailableReason,
   DexPair,
-  Finding,
-  FindingTone,
   ScanApiResponse,
   ScanErrorCode,
   ScanHistoryItem,
   ScanResult,
+  RiskLevel,
   ScoreReason,
   SecurityFinding,
   SecurityIntelligence,
@@ -263,7 +262,9 @@ function securitySummaryText(security: SecurityIntelligence) {
 }
 
 function tokenMetadataDescription(result: ScanResult) {
-  return `Liquidity ${currency(result.pair.liquidity?.usd, true)}, risk score ${result.score}/96. ${securitySummaryText(result.security)}`;
+  const scoreText =
+    result.riskLevel === "insufficient" ? "risk score unavailable because coverage is low" : `risk score ${result.score}/100`;
+  return `Liquidity ${currency(result.pair.liquidity?.usd, true)}, ${scoreText}. ${securitySummaryText(result.security)}`;
 }
 
 function tokenShareText(result: ScanResult, tokenAddress: string) {
@@ -271,7 +272,11 @@ function tokenShareText(result: ScanResult, tokenAddress: string) {
   const symbol = result.targetToken.symbol?.trim();
 
   if (symbol) lines.push(`I just scanned ${symbol} on BaseScout.`);
-  if (Number.isFinite(result.score)) lines.push(`Risk score: ${result.score}`);
+  if (result.riskLevel !== "insufficient" && Number.isFinite(result.score)) {
+    lines.push(`Risk score: ${result.score}/100 (${result.verdict})`);
+  } else {
+    lines.push("Risk score: insufficient data");
+  }
   if (Number.isFinite(result.pair.liquidity?.usd)) lines.push(`Liquidity: ${currency(result.pair.liquidity?.usd, true)}`);
 
   lines.push("Research Base tokens before you interact.");
@@ -486,11 +491,6 @@ function dateText(timestamp?: number) {
   }).format(new Date(timestamp));
 }
 
-function thresholdAgeText(days: number) {
-  if (days < 1) return `${Math.max(1, Math.floor(days * 24))} hours`;
-  return `${Math.floor(days)} days`;
-}
-
 function supplyText(value?: string) {
   if (!value) return "Unavailable";
   if (value.length <= 12) return value;
@@ -539,580 +539,8 @@ function isMutedValue(value: string) {
   return value === "Plan restricted" || value === "Not available";
 }
 
-function clampScore(score: number) {
-  return Math.max(4, Math.min(96, score));
-}
-
 function sameAddress(a?: string, b?: string) {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
-}
-
-function getTargetToken(pair: DexPair, tokenAddress: string) {
-  if (sameAddress(pair.baseToken?.address, tokenAddress)) return pair.baseToken ?? {};
-  if (sameAddress(pair.quoteToken?.address, tokenAddress)) return pair.quoteToken ?? {};
-  return pair.baseToken ?? {};
-}
-
-function addFinding(findings: Finding[], title: string, detail: string, delta: number, tone: FindingTone) {
-  findings.push({ title, detail, delta, tone });
-  return delta;
-}
-
-function calculateRisk(pair: DexPair, tokenAddress: string, baseScan: BaseScanIntelligence): ScanResult {
-  let score = 72;
-  const findings: Finding[] = [];
-  const liquidity = pair.liquidity?.usd ?? 0;
-  const days = ageInDays(pair.pairCreatedAt);
-  const buys = pair.txns?.h24?.buys ?? 0;
-  const sells = pair.txns?.h24?.sells ?? 0;
-  const txns = buys + sells;
-  const volume = pair.volume?.h24 ?? 0;
-  const marketValue = pair.marketCap ?? pair.fdv ?? 0;
-  const priceChange = pair.priceChange?.h24 ?? 0;
-
-  if (liquidity >= 500_000) {
-    score += addFinding(
-      findings,
-      "Deep liquidity",
-      `${currency(liquidity)} is above the $500k deep-liquidity threshold, reducing expected slippage.`,
-      5,
-      "positive"
-    );
-  } else if (liquidity >= 50_000) {
-    score += addFinding(
-      findings,
-      "Moderate liquidity",
-      `${currency(liquidity)} sits inside the $50k-$500k watch zone where position size matters.`,
-      -9,
-      "warning"
-    );
-  } else {
-    score += addFinding(
-      findings,
-      "Thin liquidity",
-      `${currency(liquidity)} is below the $50k thin-liquidity threshold and can move sharply on small orders.`,
-      -18,
-      "danger"
-    );
-  }
-
-  if (!Number.isFinite(days)) {
-    addFinding(findings, "Pair age unavailable", "DEX Screener did not return a pair creation timestamp.", 0, "neutral");
-  } else if ((days as number) >= 30) {
-    score += addFinding(
-      findings,
-      "Established pair",
-      `Pair age is ${thresholdAgeText(days as number)}, above the 30-day maturity threshold.`,
-      5,
-      "positive"
-    );
-  } else if ((days as number) >= 3) {
-    score += addFinding(
-      findings,
-      "Young pair",
-      `Pair age is ${thresholdAgeText(days as number)}, inside the 3-30 day watch zone.`,
-      -9,
-      "warning"
-    );
-  } else {
-    score += addFinding(
-      findings,
-      "Very new pair",
-      `Pair age is ${thresholdAgeText(days as number)}, below the 3-day new-pair threshold.`,
-      -18,
-      "danger"
-    );
-  }
-
-  if (txns >= 1_000) {
-    score += addFinding(
-      findings,
-      "Active trading",
-      `${numberText(txns)} transactions in 24h (${numberText(buys)} buys, ${numberText(sells)} sells), above the 1,000 activity threshold.`,
-      5,
-      "positive"
-    );
-  } else if (txns >= 100) {
-    score += addFinding(
-      findings,
-      "Limited trading",
-      `${numberText(txns)} transactions in 24h (${numberText(buys)} buys, ${numberText(sells)} sells), inside the 100-999 activity watch zone.`,
-      -9,
-      "warning"
-    );
-  } else {
-    score += addFinding(
-      findings,
-      "Low transaction count",
-      `${numberText(txns)} transactions in 24h (${numberText(buys)} buys, ${numberText(sells)} sells), below the 100 transaction threshold.`,
-      -18,
-      "danger"
-    );
-  }
-
-  if (liquidity > 0) {
-    const turnoverRatio = volume / liquidity;
-    if (turnoverRatio > 10) {
-      score += addFinding(
-        findings,
-        "Turnover spike",
-        `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, above the 10x churn threshold.`,
-        -9,
-        "warning"
-      );
-    } else {
-      addFinding(
-        findings,
-        "Turnover contained",
-        `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, below the 10x churn threshold.`,
-        0,
-        "neutral"
-      );
-    }
-  }
-
-  if (liquidity > 0 && marketValue > 0) {
-    const capRatio = marketValue / liquidity;
-    if (capRatio > 80) {
-      score += addFinding(
-        findings,
-        "Extreme valuation gap",
-        `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 80x extreme threshold.`,
-        -18,
-        "danger"
-      );
-    } else if (capRatio > 25) {
-      score += addFinding(
-        findings,
-        "Elevated valuation gap",
-        `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 25x watch threshold.`,
-        -9,
-        "warning"
-      );
-    } else {
-      addFinding(
-        findings,
-        "Valuation supported",
-        `Market value/liquidity is ${capRatio.toFixed(1)}x, below the 25x watch threshold.`,
-        0,
-        "neutral"
-      );
-    }
-  } else {
-    addFinding(
-      findings,
-      "Valuation ratio unavailable",
-      "Market cap, FDV, or liquidity was missing, so market value/liquidity could not be scored.",
-      0,
-      "neutral"
-    );
-  }
-
-  const absoluteMove = Math.abs(priceChange);
-  if (absoluteMove > 80) {
-    score += addFinding(
-      findings,
-      "Extreme price move",
-      `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 80% extreme-volatility threshold.`,
-      -18,
-      "danger"
-    );
-  } else if (absoluteMove > 30) {
-    score += addFinding(
-      findings,
-      "Large price move",
-      `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 30% volatility watch threshold.`,
-      -9,
-      "warning"
-    );
-  } else {
-    addFinding(
-      findings,
-      "Price move contained",
-      `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, below the 30% volatility watch threshold.`,
-      0,
-      "neutral"
-    );
-  }
-
-  if (baseScan.status === "unavailable") {
-    addFinding(
-      findings,
-      "BaseScan checks unavailable",
-      baseScan.note ?? "BaseScan checks unavailable. DEX Screener-only analysis is shown.",
-      0,
-      "neutral"
-    );
-  } else if (baseScan.status === "available") {
-    if (baseScan.verificationStatus === "verified") {
-      score += addFinding(
-        findings,
-        "Verified contract",
-        `${baseScan.contractName ? `${baseScan.contractName} ` : "Contract "}source is verified on BaseScan.`,
-        5,
-        "positive"
-      );
-    } else if (baseScan.verificationStatus === "unverified") {
-      score += addFinding(
-        findings,
-        "Unverified contract",
-        "BaseScan does not show verified source code for this contract.",
-        -18,
-        "danger"
-      );
-    } else {
-      addFinding(
-        findings,
-        "Verification unknown",
-        "BaseScan did not return a conclusive source verification result.",
-        0,
-        "neutral"
-      );
-    }
-
-    const contractAgeDays = ageInDays(baseScan.createdAt);
-    if (Number.isFinite(contractAgeDays)) {
-      if ((contractAgeDays as number) < 3) {
-        score += addFinding(
-          findings,
-          "Fresh deployment",
-          `Contract age is ${thresholdAgeText(contractAgeDays as number)}, below the 3-day deployment threshold.`,
-          -18,
-          "danger"
-        );
-      } else if ((contractAgeDays as number) < 30) {
-        score += addFinding(
-          findings,
-          "Recent deployment",
-          `Contract age is ${thresholdAgeText(contractAgeDays as number)}, inside the 3-30 day watch zone.`,
-          -9,
-          "warning"
-        );
-      } else {
-        addFinding(
-          findings,
-          "Deployment age established",
-          `Contract age is ${thresholdAgeText(contractAgeDays as number)}, above the 30-day watch zone.`,
-          0,
-          "neutral"
-        );
-      }
-    }
-
-    if (baseScan.deployer) {
-      addFinding(
-        findings,
-        "Deployer found",
-        `BaseScan reports deployer ${baseScan.deployer}.`,
-        0,
-        "neutral"
-      );
-    }
-
-    if (Number.isFinite(baseScan.holderCount)) {
-      if ((baseScan.holderCount as number) < 100) {
-        score += addFinding(
-          findings,
-          "Holder count very low",
-          `${numberText(baseScan.holderCount)} holders is below the 100-holder danger threshold.`,
-          -12,
-          "danger"
-        );
-      } else if ((baseScan.holderCount as number) < 1_000) {
-        score += addFinding(
-          findings,
-          "Holder count low",
-          `${numberText(baseScan.holderCount)} holders is inside the 100-1,000 holder watch zone.`,
-          -6,
-          "warning"
-        );
-      } else {
-        addFinding(
-          findings,
-          "Holder count established",
-          `${numberText(baseScan.holderCount)} holders is above the 1,000-holder watch zone.`,
-          0,
-          "neutral"
-        );
-      }
-    }
-  }
-
-  const finalScore = clampScore(score);
-  const verdict =
-    finalScore >= 75 ? "Lower risk" : finalScore >= 45 ? "Moderate risk" : "High risk";
-
-  return {
-    pair,
-    pairs: [pair],
-    targetToken: getTargetToken(pair, tokenAddress),
-    baseScan,
-    security: emptySecurityIntelligence(),
-    score: finalScore,
-    verdict,
-    breakdown: {
-      overall: finalScore,
-      market: finalScore,
-      contract: finalScore,
-      confidence: {
-        score: 0,
-        label: "Low",
-        completedChecks: [],
-        unavailableChecks: ["Legacy scorer"],
-        reasons: []
-      },
-      marketReasons: findings,
-      contractReasons: []
-    },
-    findings
-  };
-}
-
-function addReason(reasons: ScoreReason[], title: string, detail: string, delta: number, tone: FindingTone) {
-  reasons.push({ title, detail, delta, tone });
-  return delta;
-}
-
-function confidenceLabel(score: number) {
-  if (score >= 75) return "High";
-  if (score >= 45) return "Medium";
-  return "Low";
-}
-
-function calculateRiskBreakdown(pair: DexPair, pairs: DexPair[], tokenAddress: string, baseScan: BaseScanIntelligence, security: SecurityIntelligence): ScanResult {
-  let marketScore = 72;
-  let contractScore = 72;
-  const marketReasons: ScoreReason[] = [];
-  const contractReasons: ScoreReason[] = [];
-  const confidenceReasons: ScoreReason[] = [];
-  const completedChecks: string[] = [];
-  const unavailableChecks: string[] = [];
-  const liquidity = pair.liquidity?.usd;
-  const days = ageInDays(pair.pairCreatedAt);
-  const buys = pair.txns?.h24?.buys;
-  const sells = pair.txns?.h24?.sells;
-  const hasTxnData = Number.isFinite(buys) || Number.isFinite(sells);
-  const txns = (buys ?? 0) + (sells ?? 0);
-  const volume = pair.volume?.h24;
-  const marketValue = pair.marketCap ?? pair.fdv;
-  const priceChange = pair.priceChange?.h24;
-  const complete = (check: string) => completedChecks.push(check);
-  const unavailable = (check: string) => unavailableChecks.push(check);
-
-  if (pairs.length) complete("Base market discovery");
-  else unavailable("Base market discovery");
-
-  if (Number.isFinite(liquidity)) {
-    complete("Liquidity");
-    if ((liquidity as number) >= 500_000) {
-      marketScore += addReason(marketReasons, "Strong liquidity", `${currency(liquidity)} is above the $500k strong-liquidity threshold.`, 8, "positive");
-    } else if ((liquidity as number) >= 50_000) {
-      marketScore += addReason(marketReasons, "Moderate liquidity", `${currency(liquidity)} sits inside the $50k-$500k watch zone where position size matters.`, -6, "warning");
-    } else {
-      marketScore += addReason(marketReasons, "Low liquidity", `${currency(liquidity)} is below the $50k low-liquidity threshold and can move sharply on small orders.`, -18, "danger");
-    }
-  } else {
-    unavailable("Liquidity");
-    marketScore += addReason(marketReasons, "Liquidity unavailable", "DEX Screener did not return USD liquidity. Missing liquidity is treated as lower confidence, not safety.", -8, "warning");
-  }
-
-  if (Number.isFinite(days)) {
-    complete("Pair age");
-    if ((days as number) >= 30) {
-      marketScore += addReason(marketReasons, "Established pair", `Pair age is ${thresholdAgeText(days as number)}, above the 30-day maturity threshold.`, 6, "positive");
-    } else if ((days as number) >= 3) {
-      marketScore += addReason(marketReasons, "Young pair", `Pair age is ${thresholdAgeText(days as number)}, inside the 3-30 day watch zone.`, -8, "warning");
-    } else {
-      marketScore += addReason(marketReasons, "New pair", `Pair age is ${thresholdAgeText(days as number)}, below the 3-day new-pair threshold.`, -18, "danger");
-    }
-  } else {
-    unavailable("Pair age");
-    marketScore += addReason(marketReasons, "Pair age unavailable", "DEX Screener did not return a pair creation timestamp.", -6, "warning");
-  }
-
-  if (hasTxnData) {
-    complete("24h transactions");
-    if (txns >= 1_000) {
-      marketScore += addReason(marketReasons, "Active trading", `${numberText(txns)} transactions in 24h (${numberText(buys ?? 0)} buys, ${numberText(sells ?? 0)} sells), above the 1,000 activity threshold.`, 6, "positive");
-    } else if (txns >= 100) {
-      marketScore += addReason(marketReasons, "Limited trading", `${numberText(txns)} transactions in 24h (${numberText(buys ?? 0)} buys, ${numberText(sells ?? 0)} sells), inside the 100-999 activity watch zone.`, -8, "warning");
-    } else {
-      marketScore += addReason(marketReasons, "Low transaction count", `${numberText(txns)} transactions in 24h (${numberText(buys ?? 0)} buys, ${numberText(sells ?? 0)} sells), below the 100 transaction threshold.`, -16, "danger");
-    }
-  } else {
-    unavailable("24h transactions");
-    marketScore += addReason(marketReasons, "Transaction data unavailable", "DEX Screener did not return 24h transaction counts.", -6, "warning");
-  }
-
-  if (Number.isFinite(volume)) {
-    complete("24h volume");
-  } else {
-    unavailable("24h volume");
-    marketScore += addReason(marketReasons, "Volume unavailable", "DEX Screener did not return 24h volume, so turnover quality cannot be confirmed.", -4, "warning");
-  }
-
-  if (Number.isFinite(liquidity) && Number.isFinite(volume) && (liquidity as number) > 0) {
-    const turnoverRatio = (volume as number) / (liquidity as number);
-    if (turnoverRatio > 10) {
-      marketScore += addReason(marketReasons, "Turnover spike", `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, above the 10x churn threshold.`, -9, "warning");
-    } else {
-      addReason(marketReasons, "Turnover contained", `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, below the 10x churn threshold.`, 0, "neutral");
-    }
-  }
-
-  if (Number.isFinite(marketValue)) {
-    complete(pair.marketCap ? "Market cap" : "FDV");
-    if (Number.isFinite(liquidity) && (liquidity as number) > 0) {
-      const capRatio = (marketValue as number) / (liquidity as number);
-      if (capRatio > 80) {
-        marketScore += addReason(marketReasons, "Extreme valuation gap", `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 80x extreme threshold.`, -16, "danger");
-      } else if (capRatio > 25) {
-        marketScore += addReason(marketReasons, "Elevated valuation gap", `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 25x watch threshold.`, -8, "warning");
-      } else {
-        addReason(marketReasons, "Valuation supported", `Market value/liquidity is ${capRatio.toFixed(1)}x, below the 25x watch threshold.`, 0, "neutral");
-      }
-    }
-  } else {
-    unavailable("Market cap or FDV");
-    marketScore += addReason(marketReasons, "Valuation data unavailable", "Market cap and FDV were missing, so valuation/liquidity could not be scored.", -4, "warning");
-  }
-
-  if (Number.isFinite(priceChange)) {
-    complete("24h price change");
-    const absoluteMove = Math.abs(priceChange as number);
-    if (absoluteMove > 80) {
-      marketScore += addReason(marketReasons, "Extreme volatility", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 80% extreme-volatility threshold.`, -16, "danger");
-    } else if (absoluteMove > 30) {
-      marketScore += addReason(marketReasons, "High volatility", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 30% volatility watch threshold.`, -8, "warning");
-    } else {
-      addReason(marketReasons, "Price move contained", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, below the 30% volatility watch threshold.`, 0, "neutral");
-    }
-  } else {
-    unavailable("24h price change");
-    marketScore += addReason(marketReasons, "Volatility unavailable", "DEX Screener did not return 24h price change.", -4, "warning");
-  }
-
-  if (baseScan.status === "unavailable") {
-    ["Contract verification", "Contract age", "Deployer", "Token supply", "Holder count"].forEach(unavailable);
-    contractScore += addReason(contractReasons, "Incomplete contract data", baseScan.note ?? "BaseScan contract intelligence is unavailable. Missing contract data is not treated as safe.", -10, "warning");
-  } else if (baseScan.status === "available") {
-    if (baseScan.verificationStatus === "verified") {
-      complete("Contract verification");
-      contractScore += addReason(contractReasons, "Verified contract", `${baseScan.contractName ? `${baseScan.contractName} ` : "Contract "}source is verified on BaseScan.`, 8, "positive");
-    } else if (baseScan.verificationStatus === "unverified") {
-      complete("Contract verification");
-      contractScore += addReason(contractReasons, "Unverified contract", "BaseScan does not show verified source code for this contract.", -18, "danger");
-    } else {
-      unavailable("Contract verification");
-      contractScore += addReason(contractReasons, "Verification unknown", "BaseScan did not return a conclusive source verification result.", -8, "warning");
-    }
-
-    const contractAgeDays = ageInDays(baseScan.createdAt);
-    if (Number.isFinite(contractAgeDays)) {
-      complete("Contract age");
-      if ((contractAgeDays as number) < 3) {
-        contractScore += addReason(contractReasons, "Fresh deployment", `Contract age is ${thresholdAgeText(contractAgeDays as number)}, below the 3-day deployment threshold.`, -18, "danger");
-      } else if ((contractAgeDays as number) < 30) {
-        contractScore += addReason(contractReasons, "Recent deployment", `Contract age is ${thresholdAgeText(contractAgeDays as number)}, inside the 3-30 day watch zone.`, -8, "warning");
-      } else {
-        contractScore += addReason(contractReasons, "Established deployment", `Contract age is ${thresholdAgeText(contractAgeDays as number)}, above the 30-day watch zone.`, 4, "positive");
-      }
-    } else {
-      unavailable("Contract age");
-      contractScore += addReason(contractReasons, "Contract age unavailable", "BaseScan did not return deployment age.", -6, "warning");
-    }
-
-    if (baseScan.deployer) {
-      complete("Deployer");
-      addReason(contractReasons, "Deployer found", `BaseScan reports deployer ${baseScan.deployer}.`, 0, "neutral");
-    } else {
-      unavailable("Deployer");
-      contractScore += addReason(contractReasons, "Deployer unavailable", "BaseScan did not return a deployer address.", -3, "warning");
-    }
-
-    if (Number.isFinite(baseScan.holderCount)) {
-      complete("Holder count");
-      if ((baseScan.holderCount as number) < 100) {
-        contractScore += addReason(contractReasons, "Holder count very low", `${numberText(baseScan.holderCount)} holders is below the 100-holder danger threshold.`, -12, "danger");
-      } else if ((baseScan.holderCount as number) < 1_000) {
-        contractScore += addReason(contractReasons, "Holder count low", `${numberText(baseScan.holderCount)} holders is inside the 100-1,000 holder watch zone.`, -6, "warning");
-      } else {
-        addReason(contractReasons, "Holder count established", `${numberText(baseScan.holderCount)} holders is above the 1,000-holder watch zone.`, 0, "neutral");
-      }
-    } else {
-      unavailable("Holder count");
-      contractScore += addReason(contractReasons, "Holder count unavailable", "BaseScan did not return holder count. Missing holder distribution is not treated as safe.", -5, "warning");
-    }
-
-    if (baseScan.tokenSupply) {
-      complete("Token supply");
-      addReason(contractReasons, "Supply returned", "BaseScan returned token supply.", 0, "neutral");
-    } else {
-      unavailable("Token supply");
-      contractScore += addReason(contractReasons, "Supply unavailable", "BaseScan did not return token supply.", -3, "warning");
-    }
-  }
-
-  if (security.status === "available" || security.status === "partial") {
-    complete("Security intelligence");
-  } else {
-    unavailable("Security intelligence");
-  }
-
-  security.unavailableChecks.forEach((key) => unavailable(`Security: ${key}`));
-  const securityRisk = applySecurityContractRisk(contractScore, security);
-  contractScore = securityRisk.score;
-  contractReasons.push(...securityRisk.reasons);
-
-  const clampedMarketScore = clampScore(marketScore);
-  const clampedContractScore = clampScore(contractScore);
-  const totalChecks = completedChecks.length + unavailableChecks.length;
-  const confidenceScore = Math.round(totalChecks ? (completedChecks.length / totalChecks) * 96 : 0);
-
-  addReason(confidenceReasons, "Completed checks", `${completedChecks.length} of ${totalChecks} checks completed.`, completedChecks.length, "positive");
-  if (unavailableChecks.length) {
-    addReason(confidenceReasons, "Unavailable checks", unavailableChecks.join(", "), -unavailableChecks.length, unavailableChecks.length >= 4 ? "danger" : "warning");
-  } else {
-    addReason(confidenceReasons, "No unavailable checks", "All configured checks returned usable data.", 0, "neutral");
-  }
-
-  const overallScore = clampScore(Math.round(clampedMarketScore * 0.55 + clampedContractScore * 0.35 + confidenceScore * 0.1));
-  const verdict =
-    confidenceScore < 35
-      ? "Insufficient data"
-      : security.criticalCount > 0 || overallScore < 25
-        ? "Critical risk"
-        : overallScore >= 75
-          ? "Lower risk"
-          : overallScore >= 45
-            ? "Moderate risk"
-            : "High risk";
-  const findings: Finding[] = [...marketReasons, ...contractReasons, ...confidenceReasons];
-
-  return {
-    pair,
-    pairs,
-    targetToken: getTargetToken(pair, tokenAddress),
-    baseScan,
-    security,
-    score: overallScore,
-    verdict,
-    breakdown: {
-      overall: overallScore,
-      market: clampedMarketScore,
-      contract: clampedContractScore,
-      confidence: {
-        score: confidenceScore,
-        label: confidenceLabel(confidenceScore),
-        completedChecks,
-        unavailableChecks,
-        reasons: confidenceReasons
-      },
-      marketReasons,
-      contractReasons
-    },
-    findings
-  };
 }
 
 async function writeClipboardText(text: string) {
@@ -1143,10 +571,14 @@ async function writeClipboardText(text: string) {
   if (!copied) throw new Error("Copy command failed");
 }
 
-function scoreTone(score: number) {
-  if (score >= 75) return "good";
-  if (score >= 45) return "caution";
-  return "bad";
+function scoreTone(level: RiskLevel) {
+  return riskTone(level);
+}
+
+function storedRiskScoreText(score: number, scoreVersion?: string, riskLevel?: RiskLevel) {
+  if (scoreVersion !== RISK_SCORE_VERSION) return "Rescan";
+  if (riskLevel === "insufficient") return "Low data";
+  return `${score}/100`;
 }
 
 function App() {
@@ -1197,9 +629,17 @@ function App() {
 
   const scoreStyle = useMemo(() => {
     if (!result) return undefined;
+    const scoreColor =
+      result.riskLevel === "lower"
+        ? "#15b881"
+        : result.riskLevel === "moderate"
+          ? "#f4a62a"
+          : result.riskLevel === "insufficient"
+            ? "#9aa6b6"
+            : "#e5484d";
     return {
       "--score": `${result.score * 3.6}deg`,
-      "--score-color": result.score >= 75 ? "#15b881" : result.score >= 45 ? "#f4a62a" : "#e5484d"
+      "--score-color": scoreColor
     } as React.CSSProperties;
   }, [result]);
 
@@ -1390,7 +830,13 @@ function App() {
         return;
       }
 
-      const scanResult = calculateRiskBreakdown(payload.pair, payload.pairs, tokenAddress, baseScanIntelligence, securityIntelligence);
+      const scanResult = calculateRiskReport({
+        pair: payload.pair,
+        pairs: payload.pairs,
+        tokenAddress,
+        baseScan: baseScanIntelligence,
+        security: securityIntelligence
+      });
       const historyItem = buildScanHistoryItem(scanResult, tokenAddress);
       const watchlistItem = buildWatchlistItem(scanResult, tokenAddress);
       const routeAddress = historyItem?.address ?? scanResult.targetToken.address ?? tokenAddress;
@@ -1412,6 +858,8 @@ function App() {
         source: context.source,
         ...tokenAnalyticsProperties(historyItem?.address ?? scanResult.targetToken.address ?? tokenAddress, scanResult.targetToken.symbol ?? context.symbol),
         risk_score: scanResult.score,
+        risk_score_version: scanResult.scoreVersion,
+        risk_level: scanResult.riskLevel,
         market_risk: scanResult.breakdown.market,
         contract_risk: scanResult.breakdown.contract,
         data_confidence: scanResult.breakdown.confidence.score,
@@ -1663,7 +1111,7 @@ function App() {
       />
 
       <section className="dashboard" aria-live="polite">
-        <article className={`risk-card ${result ? scoreTone(result.score) : ""} ${isLoading ? "loading" : ""}`}>
+        <article className={`risk-card ${result ? scoreTone(result.riskLevel) : ""} ${isLoading ? "loading" : ""}`}>
           <div className="card-heading">
             <div>
               <p className="section-kicker">Overall Risk Score</p>
@@ -1672,9 +1120,9 @@ function App() {
             {isLoading ? (
               <Loader2 className="spin" size={24} />
             ) : result ? (
-              result.score >= 75 ? (
+              result.riskLevel === "lower" ? (
                 <ShieldCheck size={24} />
-              ) : result.score >= 45 ? (
+              ) : result.riskLevel === "moderate" || result.riskLevel === "insufficient" ? (
                 <ShieldQuestion size={24} />
               ) : (
                 <ShieldAlert size={24} />
@@ -1694,8 +1142,8 @@ function App() {
                   </>
                 ) : (
                   <>
-                    <strong>{result?.score ?? "--"}</strong>
-                    <span>/96</span>
+                    <strong>{result?.riskLevel === "insufficient" ? "--" : (result?.score ?? "--")}</strong>
+                    <span>{result?.riskLevel === "insufficient" ? "Low data" : "/100"}</span>
                   </>
                 )}
               </div>
@@ -2129,7 +1577,7 @@ function ScoreBucket({
           <strong>{title}</strong>
           {subtitle ? <span>{subtitle}</span> : null}
         </div>
-        <b>{score}/96</b>
+        <b>{score}/100</b>
       </div>
       <div className="score-reasons">
         {reasons.map((reason) => (
@@ -2182,13 +1630,15 @@ function RiskBreakdown({ result, loading }: { result: ScanResult | null; loading
       <ScoreBucket
         score={result.breakdown.overall}
         title="Overall Risk Score"
-        subtitle="Weighted from market risk, contract risk, and confidence."
+        subtitle={`Risk Engine v${result.scoreVersion}. Higher means more risk; confidence is reported separately.`}
         reasons={[
           {
-            title: "Weighted score",
-            detail: `Market ${result.breakdown.market}/96, contract ${result.breakdown.contract}/96, data confidence ${confidence.score}/96.`,
+            title: result.breakdown.criticalFloorApplied ? "Critical risk floor" : "Weighted score",
+            detail: result.breakdown.criticalFloorApplied
+              ? `A confirmed critical finding set the minimum overall risk to 75/100. Market risk is ${result.breakdown.market}/100 and contract risk is ${result.breakdown.contract}/100.`
+              : `Market risk ${result.breakdown.market}/100 and contract risk ${result.breakdown.contract}/100. Data confidence ${confidence.score}/100 does not change risk.`,
             delta: 0,
-            tone: "neutral"
+            tone: result.breakdown.criticalFloorApplied ? "danger" : "neutral"
           }
         ]}
       />
@@ -2236,7 +1686,7 @@ function WatchlistSection({
                 <span>{item.shortAddress}</span>
               </span>
               <span className="recent-meta">
-                <b>{item.lastRiskScore}/96</b>
+                <b>{storedRiskScoreText(item.lastRiskScore, item.scoreVersion, item.riskLevel)}</b>
                 <span>{historyTimestampText(item.lastScannedAt)}</span>
               </span>
               <span className="watchlist-actions">
@@ -2392,7 +1842,7 @@ function RecentScans({
                 <span>{item.shortAddress}</span>
               </span>
               <span className="recent-meta">
-                <b>{item.riskScore}/96</b>
+                <b>{storedRiskScoreText(item.riskScore, item.scoreVersion, item.riskLevel)}</b>
                 <span>{historyTimestampText(item.timestamp)}</span>
               </span>
               <RefreshCw size={16} />
