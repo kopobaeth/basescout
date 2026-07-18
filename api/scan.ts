@@ -1,12 +1,13 @@
+import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-type DexToken = {
+export type DexToken = {
   address?: string;
   name?: string;
   symbol?: string;
 };
 
-type DexPair = {
+export type DexPair = {
   chainId: string;
   dexId?: string;
   url?: string;
@@ -37,11 +38,11 @@ type DexPair = {
   };
 };
 
-type SecurityCheckStatus = "pass" | "warning" | "critical" | "unknown";
-type SecurityEvidenceLevel = "confirmed" | "inferred" | "unavailable";
-type SecurityProviderStatus = "available" | "partial" | "unavailable";
+export type SecurityCheckStatus = "pass" | "warning" | "critical" | "unknown";
+export type SecurityEvidenceLevel = "confirmed" | "inferred" | "unavailable";
+export type SecurityProviderStatus = "available" | "partial" | "unavailable";
 
-type SecurityCheckKey =
+export type SecurityCheckKey =
   | "honeypot"
   | "buy_tax"
   | "sell_tax"
@@ -56,7 +57,7 @@ type SecurityCheckKey =
   | "owner_privileges"
   | "verified_contract";
 
-type SecurityFinding = {
+export type SecurityFinding = {
   key: SecurityCheckKey;
   label: string;
   status: SecurityCheckStatus;
@@ -66,7 +67,7 @@ type SecurityFinding = {
   value?: string;
 };
 
-type SecurityIntelligence = {
+export type SecurityIntelligence = {
   status: SecurityProviderStatus;
   provider: "goplus";
   checkedAt: number;
@@ -77,9 +78,9 @@ type SecurityIntelligence = {
   note?: string;
 };
 
-type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
-type VerificationStatus = "verified" | "unverified" | "unknown";
-type BaseScanUnavailableReason =
+export type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
+export type VerificationStatus = "verified" | "unverified" | "unknown";
+export type BaseScanUnavailableReason =
   | "missing-key"
   | "request-failed"
   | "invalid-key"
@@ -88,7 +89,7 @@ type BaseScanUnavailableReason =
   | "plan-restricted"
   | "no-data";
 
-type BaseScanIntelligence = {
+export type BaseScanIntelligence = {
   status: BaseScanStatus;
   reason?: BaseScanUnavailableReason;
   verificationStatus: VerificationStatus;
@@ -104,7 +105,7 @@ type BaseScanIntelligence = {
   note?: string;
 };
 
-type ScanErrorCode =
+export type ScanErrorCode =
   | "invalid_address"
   | "no_base_pair"
   | "api_timeout"
@@ -112,7 +113,7 @@ type ScanErrorCode =
   | "partial_contract_intelligence_failure"
   | "unexpected_server_error";
 
-type ScanApiResponse = {
+export type ScanApiResponse = {
   address: string;
   pair: DexPair | null;
   pairs: DexPair[];
@@ -125,6 +126,56 @@ type ScanApiResponse = {
     baseScan?: string;
     security?: string;
   };
+};
+
+type FindingTone = "positive" | "warning" | "danger" | "neutral";
+
+type ScoreReason = {
+  title: string;
+  detail: string;
+  delta: number;
+  tone: FindingTone;
+};
+
+type Finding = ScoreReason;
+
+type ReportProvider = {
+  id: "dexscreener" | "etherscan" | "goplus";
+  status: "available" | "partial" | "unavailable";
+  checkedAt?: string;
+  reason?: string;
+};
+
+type DataConfidence = {
+  score: number;
+  label: "High" | "Medium" | "Low";
+  completedChecks: string[];
+  unavailableChecks: string[];
+  reasons: ScoreReason[];
+};
+
+export type RiskLevel = "lower" | "moderate" | "high" | "critical" | "insufficient";
+
+type ScanResult = {
+  pair: DexPair;
+  pairs: DexPair[];
+  targetToken: DexToken;
+  baseScan: BaseScanIntelligence;
+  security: SecurityIntelligence;
+  scoreVersion: string;
+  score: number;
+  riskLevel: RiskLevel;
+  verdict: string;
+  breakdown: {
+    overall: number;
+    market: number;
+    contract: number;
+    criticalFloorApplied: boolean;
+    confidence: DataConfidence;
+    marketReasons: ScoreReason[];
+    contractReasons: ScoreReason[];
+  };
+  findings: ScoreReason[];
 };
 
 type DexResponse = {
@@ -1073,6 +1124,550 @@ async function fetchBaseScanIntelligence(tokenAddress: string, deadlineAt: numbe
   };
 }
 
+type SecurityRiskOptions = {
+  includeVerifiedContract?: boolean;
+};
+
+function reason(title: string, detail: string, delta: number, tone: ScoreReason["tone"]): ScoreReason {
+  return { title, detail, delta, tone };
+}
+
+function hasCriticalKey(check: SecurityFinding, key: SecurityFinding["key"]) {
+  return check.key === key && check.status === "critical";
+}
+
+function hasWarningKey(check: SecurityFinding, key: SecurityFinding["key"]) {
+  return check.key === key && check.status === "warning";
+}
+
+export function securityContractRiskReasons(
+  security: SecurityIntelligence,
+  { includeVerifiedContract = true }: SecurityRiskOptions = {}
+): ScoreReason[] {
+  if (security.status === "unavailable") {
+    return [
+      reason(
+        "Security data unavailable",
+        "Security provider checks did not return. This lowers confidence without changing the risk score.",
+        0,
+        "neutral"
+      )
+    ];
+  }
+
+  const reasons: ScoreReason[] = [];
+
+  for (const check of security.checks) {
+    if (hasCriticalKey(check, "honeypot")) {
+      reasons.push(reason("Confirmed honeypot risk", `${check.summary}. ${check.explanation}`, 40, "danger"));
+    } else if (hasCriticalKey(check, "sell_tax")) {
+      reasons.push(reason("Blocking sell tax", `${check.summary}. ${check.explanation}`, 40, "danger"));
+    } else if (hasWarningKey(check, "sell_tax")) {
+      reasons.push(reason("High sell tax", `${check.summary}. ${check.explanation}`, 24, "warning"));
+    } else if (check.key === "owner_can_mint" && (check.status === "warning" || check.status === "critical")) {
+      reasons.push(reason("Owner can mint", `${check.summary}. ${check.explanation}`, 16, "warning"));
+    } else if (check.key === "blacklist" && (check.status === "warning" || check.status === "critical")) {
+      reasons.push(reason("Blacklist capability", `${check.summary}. ${check.explanation}`, 16, "warning"));
+    } else if (check.key === "owner_privileges" && (check.status === "warning" || check.status === "critical")) {
+      reasons.push(reason("Owner privileges", `${check.summary}. ${check.explanation}`, 16, "warning"));
+    } else if (hasWarningKey(check, "proxy")) {
+      reasons.push(reason("Upgradeable proxy", `${check.summary}. ${check.explanation}`, 8, "warning"));
+    } else if (
+      hasWarningKey(check, "whitelist") ||
+      hasWarningKey(check, "pausable") ||
+      hasWarningKey(check, "trading_restrictions") ||
+      hasWarningKey(check, "buy_tax") ||
+      hasWarningKey(check, "transfer_tax") ||
+      hasWarningKey(check, "ownership_renounced") ||
+      hasWarningKey(check, "verified_contract")
+    ) {
+      if (check.key !== "verified_contract" || includeVerifiedContract) {
+        reasons.push(reason(check.label, `${check.summary}. ${check.explanation}`, 6, "warning"));
+      }
+    } else if (includeVerifiedContract && check.key === "verified_contract" && check.status === "pass") {
+      reasons.push(reason("Contract verified", `${check.summary}. ${check.explanation}`, -4, "positive"));
+    }
+  }
+
+  if (security.unavailableChecks.length) {
+    reasons.push(
+      reason(
+        "Incomplete security checks",
+        `${security.unavailableChecks.length} security checks were unavailable. This lowers confidence without changing the risk score.`,
+        0,
+        "neutral"
+      )
+    );
+  }
+
+  if (!reasons.length) {
+    reasons.push(reason("No critical security findings", "Security provider returned no critical owner-control, honeypot, tax, or proxy findings.", 0, "neutral"));
+  }
+
+  return reasons;
+}
+
+export function applySecurityContractRisk(
+  contractScore: number,
+  security: SecurityIntelligence,
+  options: SecurityRiskOptions = {}
+) {
+  const reasons = securityContractRiskReasons(security, options);
+  const score = reasons.reduce((nextScore, item) => nextScore + item.delta, contractScore);
+  return { score, reasons };
+}
+
+export const RISK_SCORE_VERSION = "2.0.0";
+
+const BASELINE_RISK = 28;
+const CRITICAL_RISK_FLOOR = 75;
+
+type RiskEngineInput = {
+  pair: DexPair;
+  pairs: DexPair[];
+  tokenAddress: string;
+  baseScan: BaseScanIntelligence;
+  security: SecurityIntelligence;
+};
+
+function clampScore(score: number) {
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function targetToken(pair: DexPair, tokenAddress: string) {
+  if (sameAddress(pair.baseToken?.address, tokenAddress)) return pair.baseToken ?? {};
+  if (sameAddress(pair.quoteToken?.address, tokenAddress)) return pair.quoteToken ?? {};
+  return pair.baseToken ?? {};
+}
+
+function ageInDays(timestamp?: number, now = Date.now()) {
+  if (!Number.isFinite(timestamp)) return undefined;
+  return Math.max(0, (now - (timestamp as number)) / 86_400_000);
+}
+
+function ageText(days: number) {
+  if (days < 1) return `${Math.max(1, Math.round(days * 24))}h`;
+  return `${Math.round(days)}d`;
+}
+
+function currency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: value >= 1_000_000 ? "compact" : "standard",
+    maximumFractionDigits: value >= 1_000 ? 0 : 2
+  }).format(value);
+}
+
+function numberText(value: number) {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+}
+
+function confidenceLabel(score: number) {
+  if (score >= 75) return "High";
+  if (score >= 45) return "Medium";
+  return "Low";
+}
+
+export function riskLevelFor(score: number, confidence: number, hasCriticalFinding = false): RiskLevel {
+  if (hasCriticalFinding || score >= 75) return "critical";
+  if (score >= 50) return "high";
+  if (confidence < 35) return "insufficient";
+  if (score >= 25) return "moderate";
+  return "lower";
+}
+
+export function riskVerdict(level: RiskLevel) {
+  if (level === "critical") return "Critical risk";
+  if (level === "high") return "High risk";
+  if (level === "moderate") return "Moderate risk";
+  if (level === "lower") return "Lower risk";
+  return "Insufficient data";
+}
+
+export function riskTone(level: RiskLevel) {
+  if (level === "lower") return "good";
+  if (level === "moderate") return "caution";
+  if (level === "insufficient") return "unknown";
+  return "bad";
+}
+
+function hasCriticalSecurityFinding(security: SecurityIntelligence) {
+  return security.checks.some(
+    (check) => check.status === "critical" && (check.key === "honeypot" || check.key === "sell_tax")
+  );
+}
+
+export function calculateRiskReport(
+  { pair, pairs, tokenAddress, baseScan, security }: RiskEngineInput,
+  now = Date.now()
+): ScanResult {
+  let marketRisk = BASELINE_RISK;
+  let contractRisk = BASELINE_RISK;
+  const marketReasons: ScoreReason[] = [
+    reason("Baseline market risk", "Market risk starts at 28 before confirmed signals are applied.", BASELINE_RISK, "neutral")
+  ];
+  const contractReasons: ScoreReason[] = [
+    reason("Baseline contract risk", "Contract risk starts at 28 before confirmed signals are applied.", BASELINE_RISK, "neutral")
+  ];
+  const confidenceReasons: ScoreReason[] = [];
+  const completedChecks: string[] = [];
+  const unavailableChecks: string[] = [];
+  const recordCoverage = (check: string, available: boolean) => {
+    (available ? completedChecks : unavailableChecks).push(check);
+  };
+
+  const liquidity = pair.liquidity?.usd;
+  const pairAgeDays = ageInDays(pair.pairCreatedAt, now);
+  const buys = pair.txns?.h24?.buys;
+  const sells = pair.txns?.h24?.sells;
+  const hasTxnData = Number.isFinite(buys) || Number.isFinite(sells);
+  const txns = (buys ?? 0) + (sells ?? 0);
+  const volume = pair.volume?.h24;
+  const marketValue = pair.marketCap ?? pair.fdv;
+  const priceChange = pair.priceChange?.h24;
+
+  recordCoverage("Base market discovery", pairs.length > 0);
+
+  if (Number.isFinite(liquidity)) {
+    recordCoverage("Liquidity", true);
+    if ((liquidity as number) >= 500_000) {
+      marketRisk += -8;
+      marketReasons.push(reason("Strong liquidity", `${currency(liquidity as number)} is above the $500k strong-liquidity threshold.`, -8, "positive"));
+    } else if ((liquidity as number) >= 50_000) {
+      marketRisk += 6;
+      marketReasons.push(reason("Moderate liquidity", `${currency(liquidity as number)} is inside the $50k-$500k watch zone.`, 6, "warning"));
+    } else {
+      marketRisk += 18;
+      marketReasons.push(reason("Low liquidity", `${currency(liquidity as number)} is below the $50k threshold and can move sharply on small orders.`, 18, "danger"));
+    }
+  } else {
+    recordCoverage("Liquidity", false);
+    marketReasons.push(reason("Liquidity unavailable", "Missing liquidity lowers confidence without changing market risk.", 0, "neutral"));
+  }
+
+  if (Number.isFinite(pairAgeDays)) {
+    recordCoverage("Pair age", true);
+    if ((pairAgeDays as number) >= 30) {
+      marketRisk += -6;
+      marketReasons.push(reason("Established pair", `Pair age is ${ageText(pairAgeDays as number)}, above the 30-day maturity threshold.`, -6, "positive"));
+    } else if ((pairAgeDays as number) >= 3) {
+      marketRisk += 8;
+      marketReasons.push(reason("Young pair", `Pair age is ${ageText(pairAgeDays as number)}, inside the 3-30 day watch zone.`, 8, "warning"));
+    } else {
+      marketRisk += 18;
+      marketReasons.push(reason("New pair", `Pair age is ${ageText(pairAgeDays as number)}, below the 3-day threshold.`, 18, "danger"));
+    }
+  } else {
+    recordCoverage("Pair age", false);
+    marketReasons.push(reason("Pair age unavailable", "Missing pair age lowers confidence without changing market risk.", 0, "neutral"));
+  }
+
+  if (hasTxnData) {
+    recordCoverage("24h transactions", true);
+    if (txns >= 1_000) {
+      marketRisk += -6;
+      marketReasons.push(reason("Active trading", `${numberText(txns)} transactions in 24h is above the 1,000 activity threshold.`, -6, "positive"));
+    } else if (txns >= 100) {
+      marketRisk += 8;
+      marketReasons.push(reason("Limited trading", `${numberText(txns)} transactions in 24h is inside the 100-999 watch zone.`, 8, "warning"));
+    } else {
+      marketRisk += 16;
+      marketReasons.push(reason("Low transaction count", `${numberText(txns)} transactions in 24h is below the 100 transaction threshold.`, 16, "danger"));
+    }
+  } else {
+    recordCoverage("24h transactions", false);
+    marketReasons.push(reason("Transaction data unavailable", "Missing transaction data lowers confidence without changing market risk.", 0, "neutral"));
+  }
+
+  recordCoverage("24h volume", Number.isFinite(volume));
+  if (!Number.isFinite(volume)) {
+    marketReasons.push(reason("Volume unavailable", "Missing volume lowers confidence without changing market risk.", 0, "neutral"));
+  }
+
+  if (Number.isFinite(liquidity) && Number.isFinite(volume) && (liquidity as number) > 0) {
+    const turnoverRatio = (volume as number) / (liquidity as number);
+    if (turnoverRatio > 10) {
+      marketRisk += 9;
+      marketReasons.push(reason("Turnover spike", `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, above the 10x churn threshold.`, 9, "warning"));
+    } else {
+      marketReasons.push(reason("Turnover contained", `24h volume/liquidity is ${turnoverRatio.toFixed(1)}x, below the 10x churn threshold.`, 0, "neutral"));
+    }
+  }
+
+  if (Number.isFinite(marketValue)) {
+    recordCoverage(pair.marketCap ? "Market cap" : "FDV", true);
+    if (Number.isFinite(liquidity) && (liquidity as number) > 0) {
+      const capRatio = (marketValue as number) / (liquidity as number);
+      if (capRatio > 80) {
+        marketRisk += 16;
+        marketReasons.push(reason("Extreme valuation gap", `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 80x threshold.`, 16, "danger"));
+      } else if (capRatio > 25) {
+        marketRisk += 8;
+        marketReasons.push(reason("Elevated valuation gap", `Market value/liquidity is ${capRatio.toFixed(1)}x, above the 25x watch threshold.`, 8, "warning"));
+      } else {
+        marketReasons.push(reason("Valuation supported", `Market value/liquidity is ${capRatio.toFixed(1)}x, below the 25x watch threshold.`, 0, "neutral"));
+      }
+    }
+  } else {
+    recordCoverage("Market cap or FDV", false);
+    marketReasons.push(reason("Valuation data unavailable", "Missing valuation data lowers confidence without changing market risk.", 0, "neutral"));
+  }
+
+  if (Number.isFinite(priceChange)) {
+    recordCoverage("24h price change", true);
+    const absoluteMove = Math.abs(priceChange as number);
+    if (absoluteMove > 80) {
+      marketRisk += 16;
+      marketReasons.push(reason("Extreme volatility", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 80% threshold.`, 16, "danger"));
+    } else if (absoluteMove > 30) {
+      marketRisk += 8;
+      marketReasons.push(reason("High volatility", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, above the 30% watch threshold.`, 8, "warning"));
+    } else {
+      marketReasons.push(reason("Price move contained", `Absolute 24h price move is ${absoluteMove.toFixed(2)}%, below the 30% watch threshold.`, 0, "neutral"));
+    }
+  } else {
+    recordCoverage("24h price change", false);
+    marketReasons.push(reason("Volatility unavailable", "Missing price change lowers confidence without changing market risk.", 0, "neutral"));
+  }
+
+  const hasBaseScan = baseScan.status === "available";
+  const hasVerification = hasBaseScan && baseScan.verificationStatus !== "unknown";
+  const contractAgeDays = ageInDays(baseScan.createdAt, now);
+  recordCoverage("Contract verification", hasVerification);
+  recordCoverage("Contract age", hasBaseScan && Number.isFinite(contractAgeDays));
+  recordCoverage("Deployer", hasBaseScan && Boolean(baseScan.deployer));
+  recordCoverage("Token supply", hasBaseScan && Boolean(baseScan.tokenSupply));
+  recordCoverage("Holder count", hasBaseScan && Number.isFinite(baseScan.holderCount));
+
+  if (!hasBaseScan) {
+    contractReasons.push(reason("Contract data unavailable", baseScan.note ?? "Missing BaseScan data lowers confidence without changing contract risk.", 0, "neutral"));
+  } else {
+    if (baseScan.verificationStatus === "verified") {
+      contractRisk += -8;
+      contractReasons.push(reason("Verified contract", `${baseScan.contractName ? `${baseScan.contractName} ` : "Contract "}source is verified on BaseScan.`, -8, "positive"));
+    } else if (baseScan.verificationStatus === "unverified") {
+      contractRisk += 18;
+      contractReasons.push(reason("Unverified contract", "BaseScan does not show verified source code for this contract.", 18, "danger"));
+    } else {
+      contractReasons.push(reason("Verification unknown", "Missing verification data lowers confidence without changing contract risk.", 0, "neutral"));
+    }
+
+    if (Number.isFinite(contractAgeDays)) {
+      if ((contractAgeDays as number) < 3) {
+        contractRisk += 18;
+        contractReasons.push(reason("Fresh deployment", `Contract age is ${ageText(contractAgeDays as number)}, below the 3-day threshold.`, 18, "danger"));
+      } else if ((contractAgeDays as number) < 30) {
+        contractRisk += 8;
+        contractReasons.push(reason("Recent deployment", `Contract age is ${ageText(contractAgeDays as number)}, inside the 3-30 day watch zone.`, 8, "warning"));
+      } else {
+        contractRisk += -4;
+        contractReasons.push(reason("Established deployment", `Contract age is ${ageText(contractAgeDays as number)}, above the 30-day watch zone.`, -4, "positive"));
+      }
+    }
+
+    if (Number.isFinite(baseScan.holderCount)) {
+      if ((baseScan.holderCount as number) < 100) {
+        contractRisk += 12;
+        contractReasons.push(reason("Holder count very low", `${numberText(baseScan.holderCount as number)} holders is below the 100-holder threshold.`, 12, "danger"));
+      } else if ((baseScan.holderCount as number) < 1_000) {
+        contractRisk += 6;
+        contractReasons.push(reason("Holder count low", `${numberText(baseScan.holderCount as number)} holders is inside the 100-1,000 watch zone.`, 6, "warning"));
+      } else {
+        contractReasons.push(reason("Holder count established", `${numberText(baseScan.holderCount as number)} holders is above the 1,000 watch zone.`, 0, "neutral"));
+      }
+    }
+  }
+
+  const securityChecksByKey = new Map(security.checks.map((check) => [check.key, check]));
+  for (const key of SECURITY_CHECK_KEYS) {
+    const check = securityChecksByKey.get(key);
+    recordCoverage(`Security: ${key}`, Boolean(check && check.status !== "unknown"));
+  }
+
+  const securityRisk = applySecurityContractRisk(contractRisk, security, {
+    includeVerifiedContract: !hasVerification
+  });
+  contractRisk = securityRisk.score;
+  contractReasons.push(...securityRisk.reasons);
+
+  const marketScore = clampScore(marketRisk);
+  const contractScore = clampScore(contractRisk);
+  const totalChecks = completedChecks.length + unavailableChecks.length;
+  const confidenceScore = clampScore(totalChecks ? (completedChecks.length / totalChecks) * 100 : 0);
+
+  confidenceReasons.push(
+    reason("Completed checks", `${completedChecks.length} of ${totalChecks} configured checks returned usable data.`, completedChecks.length, "positive")
+  );
+  if (unavailableChecks.length) {
+    confidenceReasons.push(
+      reason(
+        "Unavailable checks",
+        unavailableChecks.join(", "),
+        -unavailableChecks.length,
+        unavailableChecks.length >= 8 ? "danger" : "warning"
+      )
+    );
+  } else {
+    confidenceReasons.push(reason("Full coverage", "All configured checks returned usable data.", 0, "positive"));
+  }
+
+  const weightedScore = clampScore(marketScore * 0.55 + contractScore * 0.45);
+  const hasCriticalFinding = hasCriticalSecurityFinding(security);
+  const criticalFloorApplied = hasCriticalFinding && weightedScore < CRITICAL_RISK_FLOOR;
+  const overallScore = criticalFloorApplied ? CRITICAL_RISK_FLOOR : weightedScore;
+  const riskLevel = riskLevelFor(overallScore, confidenceScore, hasCriticalFinding);
+  const findings: Finding[] = [...marketReasons, ...contractReasons, ...confidenceReasons];
+
+  return {
+    pair,
+    pairs,
+    targetToken: targetToken(pair, tokenAddress),
+    baseScan,
+    security,
+    scoreVersion: RISK_SCORE_VERSION,
+    score: overallScore,
+    riskLevel,
+    verdict: riskVerdict(riskLevel),
+    breakdown: {
+      overall: overallScore,
+      market: marketScore,
+      contract: contractScore,
+      criticalFloorApplied,
+      confidence: {
+        score: confidenceScore,
+        label: confidenceLabel(confidenceScore),
+        completedChecks,
+        unavailableChecks,
+        reasons: confidenceReasons
+      },
+      marketReasons,
+      contractReasons
+    },
+    findings
+  };
+}
+
+export const REPORT_SCHEMA_VERSION = "1.0.0" as const;
+export const REPORT_CHAIN_ID = 8453 as const;
+export const REPORT_DISCLAIMER =
+  "Automated signals are not financial or security guarantees. Review the contract and market independently before interacting.";
+
+function isoTimestamp(timestamp: number) {
+  return new Date(timestamp).toISOString();
+}
+
+function baseScanSource(scan: ScanApiResponse): ReportProvider {
+  if (scan.baseScan.status !== "available") {
+    return {
+      id: "etherscan",
+      status: "unavailable",
+      reason: scan.baseScan.note ?? scan.baseScan.reason ?? "Contract intelligence unavailable."
+    };
+  }
+
+  const partial = Boolean(
+    scan.baseScan.holderCountUnavailableReason ||
+      scan.baseScan.tokenSupplyUnavailableReason ||
+      scan.baseScan.creationUnavailableReason
+  );
+
+  return {
+    id: "etherscan",
+    status: partial ? "partial" : "available",
+    reason: partial ? scan.baseScan.note ?? "Some contract intelligence fields were unavailable." : undefined
+  };
+}
+
+function securitySource(scan: ScanApiResponse): ReportProvider {
+  return {
+    id: "goplus",
+    status: scan.security.status,
+    checkedAt: Number.isFinite(scan.security.checkedAt) ? isoTimestamp(scan.security.checkedAt) : undefined,
+    reason: scan.security.note
+  };
+}
+
+export function buildVersionedRiskReport(
+  scan: ScanApiResponse,
+  requestId: string,
+  generatedAtMs = Date.now()
+) {
+  if (!scan.pair) throw new Error("Cannot build a risk report without a primary Base market.");
+
+  const generatedAt = isoTimestamp(generatedAtMs);
+  const risk = calculateRiskReport(
+    {
+      pair: scan.pair,
+      pairs: scan.pairs,
+      tokenAddress: scan.address,
+      baseScan: scan.baseScan,
+      security: scan.security
+    },
+    generatedAtMs
+  );
+
+  return {
+    schemaVersion: REPORT_SCHEMA_VERSION,
+    requestId,
+    address: scan.address.toLowerCase(),
+    chainId: REPORT_CHAIN_ID,
+    generatedAt,
+    scoreVersion: RISK_SCORE_VERSION,
+    risk: {
+      score: risk.score,
+      level: risk.riskLevel,
+      verdict: risk.verdict,
+      market: risk.breakdown.market,
+      contract: risk.breakdown.contract,
+      criticalFloorApplied: risk.breakdown.criticalFloorApplied
+    },
+    confidence: risk.breakdown.confidence,
+    token: risk.targetToken,
+    markets: {
+      primary: risk.pair,
+      all: risk.pairs
+    },
+    contract: risk.baseScan,
+    security: risk.security,
+    evidence: {
+      market: risk.breakdown.marketReasons,
+      contract: risk.breakdown.contractReasons,
+      confidence: risk.breakdown.confidence.reasons
+    },
+    sources: [
+      { id: "dexscreener", status: "available", checkedAt: generatedAt } as ReportProvider,
+      baseScanSource(scan),
+      securitySource(scan)
+    ],
+    disclaimer: REPORT_DISCLAIMER
+  };
+}
+
+function isRetryable(status: number, code: ScanErrorCode | "method_not_allowed") {
+  return code === "api_timeout" || code === "rate_limit" || status >= 500;
+}
+
+export function buildVersionedReportError(
+  status: number,
+  code: ScanErrorCode | "method_not_allowed",
+  message: string,
+  requestId: string,
+  generatedAtMs = Date.now()
+) {
+  return {
+    schemaVersion: REPORT_SCHEMA_VERSION,
+    requestId,
+    generatedAt: isoTimestamp(generatedAtMs),
+    error: {
+      code,
+      message,
+      status,
+      retryable: isRetryable(status, code)
+    }
+  };
+}
+
 function scanErrorDetails(error: unknown): { error: string; errorCode: ScanErrorCode } {
   if (error instanceof ScanApiError && error.status === 429) {
     return {
@@ -1106,14 +1701,15 @@ export function cacheControlForScanStatus(status: number) {
   return status >= 200 && status < 300 ? SUCCESS_CACHE_CONTROL : ERROR_CACHE_CONTROL;
 }
 
-function withResponseHeaders(response: ServerResponse, status: number) {
+function withResponseHeaders(response: ServerResponse, status: number, requestId?: string) {
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.setHeader("Cache-Control", cacheControlForScanStatus(status));
+  if (requestId) response.setHeader("X-Request-Id", requestId);
 }
 
-function sendJson(response: ServerResponse, status: number, payload: ScanApiResponse | { error: string; errorCode?: ScanErrorCode }) {
+function sendJson(response: ServerResponse, status: number, payload: unknown, requestId?: string) {
   try {
-    if (!response.headersSent) withResponseHeaders(response, status);
+    if (!response.headersSent) withResponseHeaders(response, status, requestId);
     response.statusCode = status;
     response.end(JSON.stringify(payload));
   } catch (error) {
@@ -1121,13 +1717,22 @@ function sendJson(response: ServerResponse, status: number, payload: ScanApiResp
     if (response.writableEnded) return;
 
     try {
-      if (!response.headersSent) withResponseHeaders(response, 500);
+      if (!response.headersSent) withResponseHeaders(response, 500, requestId);
       response.statusCode = 500;
       response.end(
-        JSON.stringify({
-          error: "Unexpected server error. Scan API could not serialize the response.",
-          errorCode: "unexpected_server_error"
-        })
+        JSON.stringify(
+          requestId
+            ? buildVersionedReportError(
+                500,
+                "unexpected_server_error",
+                "Unexpected server error. Report API could not serialize the response.",
+                requestId
+              )
+            : {
+                error: "Unexpected server error. Scan API could not serialize the response.",
+                errorCode: "unexpected_server_error"
+              }
+        )
       );
     } catch (fallbackError) {
       console.error("[BaseScout] JSON fallback response failed", fallbackError);
@@ -1140,57 +1745,135 @@ function requestUrl(request: IncomingMessage) {
 }
 
 export default async function handler(request: IncomingMessage, response: ServerResponse) {
+  const url = requestUrl(request);
+  const wantsVersionedReport =
+    url.pathname === "/api/v1/report" || url.searchParams.get("reportVersion") === "1";
+  const requestId = wantsVersionedReport ? randomUUID() : undefined;
+  const generatedAtMs = Date.now();
+
   try {
     if (request.method !== "GET") {
       response.setHeader("Allow", "GET");
-      sendJson(response, 405, { error: "Method not allowed." });
+      sendJson(
+        response,
+        405,
+        requestId
+          ? buildVersionedReportError(405, "method_not_allowed", "Method not allowed. Use GET.", requestId, generatedAtMs)
+          : { error: "Method not allowed." },
+        requestId
+      );
       return;
     }
 
-    const url = requestUrl(request);
-    const address = url.searchParams.get("address")?.trim() ?? "";
+    const result = await scanTokenData(url.searchParams.get("address") ?? "", generatedAtMs);
 
-    if (!isTokenContractAddress(address)) {
-      sendJson(response, 400, {
+    if (!wantsVersionedReport || !requestId) {
+      sendJson(response, result.status, result.payload);
+      return;
+    }
+
+    if (result.status !== 200 || !result.payload.pair) {
+      sendJson(
+        response,
+        result.status,
+        buildVersionedReportError(
+          result.status,
+          result.payload.errorCode ?? "unexpected_server_error",
+          result.payload.error ?? "The risk report could not be generated.",
+          requestId,
+          generatedAtMs
+        ),
+        requestId
+      );
+      return;
+    }
+
+    sendJson(
+      response,
+      200,
+      buildVersionedRiskReport(result.payload, requestId, generatedAtMs),
+      requestId
+    );
+  } catch (error) {
+    console.error(`[BaseScout] ${wantsVersionedReport ? "Report" : "Scan"} API failed${requestId ? ` (${requestId})` : ""}`, error);
+    sendJson(
+      response,
+      500,
+      requestId
+        ? buildVersionedReportError(
+            500,
+            "unexpected_server_error",
+            "Unexpected server error. Report API could not complete the request.",
+            requestId,
+            generatedAtMs
+          )
+        : {
+            error: "Unexpected server error. Scan API could not complete the request.",
+            errorCode: "unexpected_server_error"
+          },
+      requestId
+    );
+  }
+}
+
+export type ScanTokenDataResult = {
+  status: number;
+  payload: ScanApiResponse;
+};
+
+export async function scanTokenData(rawAddress: string, now = Date.now()): Promise<ScanTokenDataResult> {
+  const address = rawAddress.trim().toLowerCase();
+
+  if (!isTokenContractAddress(address)) {
+    return {
+      status: 400,
+      payload: {
+        address,
+        pair: null,
+        pairs: [],
+        baseScan: emptyBaseScanIntelligence("unavailable", "no-data"),
+        security: emptySecurityIntelligence("Security checks were not run because the address is invalid."),
         error: "Invalid address. Enter a non-zero 0x token contract with 40 hexadecimal characters.",
         errorCode: "invalid_address"
-      });
-      return;
-    }
+      }
+    };
+  }
 
-    const deadlineAt = Date.now() + SCAN_DEADLINE_MS;
-    const [dexResult, baseScanResult, securityResult] = await Promise.allSettled([
-      fetchDexPairs(address, deadlineAt),
-      fetchBaseScanIntelligence(address, deadlineAt),
-      fetchSecurityIntelligence(address, deadlineAt)
-    ]);
-    const baseScan =
-      baseScanResult.status === "fulfilled"
-        ? baseScanResult.value
-        : emptyBaseScanIntelligence("unavailable", "request-failed");
-    const security =
-      securityResult.status === "fulfilled"
-        ? securityResult.value
-        : emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
-    const errors: ScanApiResponse["errors"] = {};
+  const deadlineAt = now + SCAN_DEADLINE_MS;
+  const [dexResult, baseScanResult, securityResult] = await Promise.allSettled([
+    fetchDexPairs(address, deadlineAt),
+    fetchBaseScanIntelligence(address, deadlineAt),
+    fetchSecurityIntelligence(address, deadlineAt)
+  ]);
+  const baseScan =
+    baseScanResult.status === "fulfilled"
+      ? baseScanResult.value
+      : emptyBaseScanIntelligence("unavailable", "request-failed");
+  const security =
+    securityResult.status === "fulfilled"
+      ? securityResult.value
+      : emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
+  const errors: ScanApiResponse["errors"] = {};
 
-    if (baseScanResult.status === "rejected") {
-      errors.baseScan = "Partial contract intelligence failure.";
-    } else if (
-      baseScan.status === "unavailable" &&
-      baseScan.reason &&
-      !["missing-key", "no-data"].includes(baseScan.reason)
-    ) {
-      errors.baseScan = "Partial contract intelligence failure.";
-    }
+  if (baseScanResult.status === "rejected") {
+    errors.baseScan = "Partial contract intelligence failure.";
+  } else if (
+    baseScan.status === "unavailable" &&
+    baseScan.reason &&
+    !["missing-key", "no-data"].includes(baseScan.reason)
+  ) {
+    errors.baseScan = "Partial contract intelligence failure.";
+  }
 
-    if (security.status === "unavailable") {
-      errors.security = "Security intelligence unavailable.";
-    }
+  if (security.status === "unavailable") {
+    errors.security = "Security intelligence unavailable.";
+  }
 
-    if (dexResult.status === "rejected") {
-      const details = scanErrorDetails(dexResult.reason);
-      sendJson(response, 502, {
+  if (dexResult.status === "rejected") {
+    const details = scanErrorDetails(dexResult.reason);
+    return {
+      status: 502,
+      payload: {
         address,
         pair: null,
         pairs: [],
@@ -1199,15 +1882,17 @@ export default async function handler(request: IncomingMessage, response: Server
         error: details.error,
         errorCode: details.errorCode,
         errors: { ...errors, dex: details.error }
-      });
-      return;
-    }
+      }
+    };
+  }
 
-    const pairs = dexResult.value;
-    const pair = pairs[0] ?? null;
+  const pairs = dexResult.value;
+  const pair = pairs[0] ?? null;
 
-    if (!pair) {
-      sendJson(response, 404, {
+  if (!pair) {
+    return {
+      status: 404,
+      payload: {
         address,
         pair: null,
         pairs,
@@ -1216,23 +1901,19 @@ export default async function handler(request: IncomingMessage, response: Server
         error: noBasePairMessage(),
         errorCode: "no_base_pair",
         errors: Object.keys(errors).length ? errors : undefined
-      });
-      return;
-    }
+      }
+    };
+  }
 
-    sendJson(response, 200, {
+  return {
+    status: 200,
+    payload: {
       address,
       pair,
       pairs,
       baseScan,
       security,
       errors: Object.keys(errors).length ? errors : undefined
-    });
-  } catch (error) {
-    console.error("[BaseScout] Scan API failed", error);
-    sendJson(response, 500, {
-      error: "Unexpected server error. Scan API could not complete the request.",
-      errorCode: "unexpected_server_error"
-    });
-  }
+    }
+  };
 }

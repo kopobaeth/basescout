@@ -162,20 +162,64 @@ export type ScanErrorCode =
   | "partial_contract_intelligence_failure"
   | "unexpected_server_error";
 
-export type ScanApiResponse = {
+export type ReportSchemaVersion = "1.0.0";
+export type ReportProviderId = "dexscreener" | "etherscan" | "goplus";
+export type ReportProviderStatus = "available" | "partial" | "unavailable";
+
+export type ReportProvider = {
+  id: ReportProviderId;
+  status: ReportProviderStatus;
+  checkedAt?: string;
+  reason?: string;
+};
+
+export type VersionedRiskReport = {
+  schemaVersion: ReportSchemaVersion;
+  requestId: string;
   address: string;
-  pair: DexPair | null;
-  pairs: DexPair[];
-  baseScan: BaseScanIntelligence;
+  chainId: 8453;
+  generatedAt: string;
+  scoreVersion: string;
+  risk: {
+    score: number;
+    level: RiskLevel;
+    verdict: string;
+    market: number;
+    contract: number;
+    criticalFloorApplied: boolean;
+  };
+  confidence: DataConfidence;
+  token: DexToken;
+  markets: {
+    primary: DexPair;
+    all: DexPair[];
+  };
+  contract: BaseScanIntelligence;
   security: SecurityIntelligence;
-  error?: string;
-  errorCode?: ScanErrorCode;
-  errors?: {
-    dex?: string;
-    baseScan?: string;
-    security?: string;
+  evidence: {
+    market: ScoreReason[];
+    contract: ScoreReason[];
+    confidence: ScoreReason[];
+  };
+  sources: ReportProvider[];
+  disclaimer: string;
+};
+
+export type ReportErrorCode = ScanErrorCode | "method_not_allowed";
+
+export type VersionedReportError = {
+  schemaVersion: ReportSchemaVersion;
+  requestId: string;
+  generatedAt: string;
+  error: {
+    code: ReportErrorCode;
+    message: string;
+    status: number;
+    retryable: boolean;
   };
 };
+
+export type ReportApiResponse = VersionedRiskReport | VersionedReportError;
 
 export type ScanHistoryItem = {
   address: string;

@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/v1/report",
+      "destination": "/api/scan?reportVersion=1"
+    },
+    {
       "source": "/trending",
       "destination": "/index.html"
     },

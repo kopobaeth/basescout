@@ -15,6 +15,11 @@ export default defineConfig({
             return;
           }
 
+          if (pathname === "/api/v1/report") {
+            void scanHandler(request, response);
+            return;
+          }
+
           next();
         });
       }

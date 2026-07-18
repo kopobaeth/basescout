@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { normalizeGoPlusSecurityResponse as normalizeServerSecurity } from "../api/scan";
-import { applySecurityContractRisk } from "./riskSecurity";
+import {
+  applySecurityContractRisk,
+  normalizeGoPlusSecurityResponse as normalizeServerSecurity
+} from "../api/scan";
 import { normalizeGoPlusSecurityResponse } from "./security";
 import type { SecurityIntelligence } from "./types";
 

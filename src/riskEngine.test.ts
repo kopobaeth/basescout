@@ -5,7 +5,7 @@ import {
   riskLevelFor,
   riskTone,
   riskVerdict
-} from "./riskEngine";
+} from "../api/scan";
 import type {
   BaseScanIntelligence,
   DexPair,
