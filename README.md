@@ -135,6 +135,7 @@ Missing data is never treated as automatically safe or as a confirmed negative s
 - Native assets and the zero address are not accepted as token contracts. Trending can still show a native side, but only contract-backed sides are scannable.
 - Successful API responses may use short shared-cache windows. Validation, provider, and server errors use `private, no-store` so transient failures are not replayed from shared caches.
 - A confirmed `cannot_sell` provider flag is treated as critical even when the separate honeypot field is missing.
+- Vercel rewrites `/api/v1/report` to the self-contained `/api/scan` Function in report mode, avoiding runtime dependencies between separate Function entrypoints.
 
 ## Current Limitations
 
@@ -263,6 +264,7 @@ Static hosting:
 - Added canonical lowercase addresses, request IDs, provider status metadata, and consistent cache semantics
 - Preserved `/api/scan` as a backwards-compatible normalized provider endpoint
 - Added report contract and handler regression tests
+- Served the versioned report through the proven self-contained scan Function to prevent Vercel runtime module-loading failures
 - Added scan request supersession and navigation cancellation to prevent stale results from overwriting the current route
 - Added a shared server-side provider deadline below the browser timeout
 - Rejected zero-address/native assets as token contracts across manual, routed, API, and Trending scan entry points

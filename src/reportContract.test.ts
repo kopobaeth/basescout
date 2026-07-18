@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import reportHandler from "../api/v1/report";
 import {
+  default as reportHandler,
   buildVersionedReportError,
   buildVersionedRiskReport,
-  REPORT_SCHEMA_VERSION
-} from "../api/_lib/report";
-import { RISK_SCORE_VERSION } from "../api/_lib/riskEngine";
+  REPORT_SCHEMA_VERSION,
+  RISK_SCORE_VERSION
+} from "../api/scan";
 import {
   isVersionedReportError,
   isVersionedRiskReport,
