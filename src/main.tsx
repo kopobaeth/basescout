@@ -40,7 +40,9 @@ import {
   upsertWatchlistItem
 } from "./watchlist";
 import { calculateRiskReport, RISK_SCORE_VERSION, riskTone } from "./riskEngine";
+import { ScanRequestCoordinator } from "./scanRequestCoordinator";
 import { emptySecurityIntelligence } from "./security";
+import { isEvmAddress, isTokenContractAddress } from "./tokenAddress";
 import { loadTrendingPools } from "./trendingClient";
 import "./styles.css";
 import type {
@@ -84,7 +86,6 @@ type ScanErrorView = {
   message: string;
 };
 
-const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const REQUEST_TIMEOUT_MS = 15_000;
 const HOME_TITLE = document.title;
 const HOME_DESCRIPTION =
@@ -362,7 +363,7 @@ function scanErrorView(code: ScanErrorCode, message?: string): ScanErrorView {
     return {
       code,
       title: "Invalid address",
-      message: message ?? "Enter a 0x token contract with 40 hexadecimal characters."
+      message: message ?? "Enter a non-zero 0x token contract with 40 hexadecimal characters."
     };
   }
 
@@ -596,13 +597,12 @@ function App() {
   const [trendingReloadKey, setTrendingReloadKey] = useState(0);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>(() => readScanHistory());
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => readWatchlist());
-  const activeRequestRef = useRef<AbortController | null>(null);
-  const scanIdRef = useRef(0);
+  const scanRequestCoordinatorRef = useRef(new ScanRequestCoordinator());
   const securityAnalyticsRef = useRef("");
 
   const normalizedAddress = address.trim();
   const isTrendingPage = isTrendingPath(routePath);
-  const isValidAddress = ADDRESS_PATTERN.test(normalizedAddress);
+  const isValidAddress = isTokenContractAddress(normalizedAddress);
   const isLoading = status === "loading";
   const selectedPair = result?.pair;
   const selectedPairs = result?.pairs ?? [];
@@ -679,7 +679,7 @@ function App() {
     }
 
     const tokenAddress = selectedTokenAddress ?? normalizedAddress;
-    if (!ADDRESS_PATTERN.test(routeAddress) || !result || !sameAddress(routeAddress, tokenAddress)) {
+    if (!isTokenContractAddress(routeAddress) || !result || !sameAddress(routeAddress, tokenAddress)) {
       setPageMetadata("Token Risk Scan | BaseScout", HOME_DESCRIPTION, tokenPageUrl(routeAddress));
       return;
     }
@@ -697,12 +697,14 @@ function App() {
       setRoutePath(window.location.pathname);
 
       if (isTrendingPath()) {
+        cancelActiveScanForNavigation();
         setTrendingMetadata();
         return;
       }
 
       const routeAddress = tokenRouteAddress();
       if (!routeAddress) {
+        cancelActiveScanForNavigation();
         restoreHomeMetadata();
         return;
       }
@@ -711,7 +713,8 @@ function App() {
       setCopyState("idle");
       setLinkCopyState("idle");
 
-      if (!ADDRESS_PATTERN.test(routeAddress)) {
+      if (!isTokenContractAddress(routeAddress)) {
+        cancelActiveScanForNavigation();
         setStatus("error");
         setResult(null);
         setBaseScan(emptyBaseScanIntelligence());
@@ -725,7 +728,10 @@ function App() {
 
     handleTokenRoute();
     window.addEventListener("popstate", handleTokenRoute);
-    return () => window.removeEventListener("popstate", handleTokenRoute);
+    return () => {
+      window.removeEventListener("popstate", handleTokenRoute);
+      scanRequestCoordinatorRef.current.cancel();
+    };
   }, []);
 
   useEffect(() => {
@@ -750,9 +756,7 @@ function App() {
     setLinkCopyState("idle");
 
     if (status !== "idle" || result) {
-      scanIdRef.current += 1;
-      activeRequestRef.current?.abort();
-      activeRequestRef.current = null;
+      scanRequestCoordinatorRef.current.cancel();
       setStatus("idle");
       setResult(null);
       setBaseScan(emptyBaseScanIntelligence());
@@ -764,11 +768,7 @@ function App() {
   }
 
   async function scanToken(rawAddress: string, context: ScanContext = { source: "manual" }) {
-    if (activeRequestRef.current) return;
-
     const tokenAddress = rawAddress.trim();
-    const scanId = scanIdRef.current + 1;
-    scanIdRef.current = scanId;
     const scanEventProperties = {
       source: context.source,
       ...tokenAnalyticsProperties(tokenAddress, context.symbol)
@@ -780,7 +780,8 @@ function App() {
     setLinkCopyState("idle");
     trackEvent("scan_clicked", scanEventProperties);
 
-    if (!ADDRESS_PATTERN.test(tokenAddress)) {
+    if (!isTokenContractAddress(tokenAddress)) {
+      scanRequestCoordinatorRef.current.cancel();
       const view = scanErrorView("invalid_address");
       setStatus("error");
       setResult(null);
@@ -798,8 +799,8 @@ function App() {
     setResult(null);
     setBaseScan(emptyBaseScanIntelligence("loading"));
 
-    const controller = new AbortController();
-    activeRequestRef.current = controller;
+    const requestToken = scanRequestCoordinatorRef.current.start();
+    const controller = requestToken.controller;
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
@@ -815,7 +816,7 @@ function App() {
         throw new ScanUiError(scanHttpErrorView(response.status, payload));
       }
 
-      if (scanId !== scanIdRef.current) return;
+      if (!scanRequestCoordinatorRef.current.isCurrent(requestToken)) return;
       setBaseScan(baseScanIntelligence);
 
       if (!payload?.pair) {
@@ -873,7 +874,7 @@ function App() {
         partial_contract_intelligence_failure: hasPartialContractIntelligenceFailure(baseScanIntelligence)
       });
     } catch (scanError) {
-      if (scanId !== scanIdRef.current) return;
+      if (!scanRequestCoordinatorRef.current.isCurrent(requestToken)) return;
       const view = scanRequestErrorView(scanError);
       setStatus("error");
       setErrorState(view);
@@ -884,9 +885,7 @@ function App() {
       });
     } finally {
       window.clearTimeout(timeoutId);
-      if (activeRequestRef.current === controller) {
-        activeRequestRef.current = null;
-      }
+      scanRequestCoordinatorRef.current.complete(requestToken);
     }
   }
 
@@ -898,6 +897,7 @@ function App() {
 
   function handleTrendingNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
+    cancelActiveScanForNavigation();
     if (!isTrendingPage) {
       window.history.pushState({}, "", trendingPageUrl());
       setRoutePath(trendingPath());
@@ -907,11 +907,21 @@ function App() {
 
   function handleScanNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
+    cancelActiveScanForNavigation();
     if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
       window.history.pushState({}, "", homePageUrl());
     }
     setRoutePath("/");
     restoreHomeMetadata();
+  }
+
+  function cancelActiveScanForNavigation() {
+    if (!scanRequestCoordinatorRef.current.cancel()) return;
+
+    setStatus("idle");
+    setResult(null);
+    setBaseScan(emptyBaseScanIntelligence());
+    setErrorState(null);
   }
 
   function rescanHistoryItem(item: ScanHistoryItem) {
@@ -983,7 +993,7 @@ function App() {
 
   async function copyTokenLink() {
     const addressToCopy = selectedTokenAddress ?? normalizedAddress;
-    if (!ADDRESS_PATTERN.test(addressToCopy)) return;
+    if (!isEvmAddress(addressToCopy)) return;
 
     try {
       await writeClipboardText(tokenPageUrl(addressToCopy));

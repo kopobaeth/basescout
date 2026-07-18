@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { normalizeGoPlusSecurityResponse as normalizeServerSecurity } from "../api/scan";
 import { applySecurityContractRisk } from "./riskSecurity";
 import { normalizeGoPlusSecurityResponse } from "./security";
 import type { SecurityIntelligence } from "./types";
@@ -128,3 +129,14 @@ const normalizedBlockingTax = normalizeGoPlusSecurityResponse(
   tokenAddress
 );
 assert.equal(normalizedBlockingTax.checks.find((check) => check.key === "sell_tax")?.status, "critical");
+
+for (const normalizeSecurity of [normalizeGoPlusSecurityResponse, normalizeServerSecurity]) {
+  const cannotSellOnly = normalizeSecurity(
+    { result: { [tokenAddress]: { cannot_sell_all: "1" } } },
+    tokenAddress
+  );
+  const honeypotFinding = cannotSellOnly.checks.find((check) => check.key === "honeypot");
+  assert.equal(honeypotFinding?.status, "critical");
+  assert.equal(honeypotFinding?.summary, "Cannot sell detected");
+  assert.equal(cannotSellOnly.criticalCount, 1);
+}
