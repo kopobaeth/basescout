@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isTokenContractAddress } from "../src/tokenAddress";
 
 type GeckoResource = {
   id?: string;
@@ -57,6 +56,8 @@ const GECKO_ACCEPT_HEADER = "application/json;version=20230203";
 const TRENDING_CACHE_MS = 60_000;
 const TRENDING_TIMEOUT_MS = 10_000;
 const MAX_TRENDING_POOLS = 20;
+const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const SUCCESS_CACHE_CONTROL = "public, max-age=0, s-maxage=60, stale-while-revalidate=120";
 const ERROR_CACHE_CONTROL = "private, no-store";
 
@@ -100,7 +101,7 @@ function timestampValue(value: unknown) {
 }
 
 export function isScannableTokenAddress(value: string) {
-  return isTokenContractAddress(value);
+  return ADDRESS_PATTERN.test(value) && value.toLowerCase() !== ZERO_ADDRESS;
 }
 
 function relationKey(resource: GeckoResource, relationName: string) {
