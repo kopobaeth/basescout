@@ -11,7 +11,7 @@ import { isEvmAddress, isTokenContractAddress, ZERO_ADDRESS } from "./tokenAddre
 
 const tokenAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-for (const entrypoint of ["../api/scan.ts", "../api/trending.ts"]) {
+for (const entrypoint of ["../api/scan.ts", "../api/trending.ts", "../api/v1/report.ts"]) {
   const source = readFileSync(new URL(entrypoint, import.meta.url), "utf8");
   assert.doesNotMatch(source, /from\s+["']\.\.\/src\//);
 }

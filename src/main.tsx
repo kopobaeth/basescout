@@ -39,9 +39,14 @@ import {
   removeWatchlistItem,
   upsertWatchlistItem
 } from "./watchlist";
-import { calculateRiskReport, RISK_SCORE_VERSION, riskTone } from "./riskEngine";
+import {
+  isVersionedReportError,
+  isVersionedRiskReport,
+  readReportApiResponse,
+  reportToScanResult
+} from "./reportContract";
+import { CURRENT_RISK_SCORE_VERSION, riskTone } from "./riskPresentation";
 import { ScanRequestCoordinator } from "./scanRequestCoordinator";
-import { emptySecurityIntelligence } from "./security";
 import { isEvmAddress, isTokenContractAddress } from "./tokenAddress";
 import { loadTrendingPools } from "./trendingClient";
 import "./styles.css";
@@ -50,7 +55,6 @@ import type {
   BaseScanStatus,
   BaseScanUnavailableReason,
   DexPair,
-  ScanApiResponse,
   ScanErrorCode,
   ScanHistoryItem,
   ScanResult,
@@ -62,6 +66,7 @@ import type {
   TrendingPool,
   TrendingStatus,
   TrendingToken,
+  VersionedReportError,
   WatchlistItem
 } from "./types";
 
@@ -114,29 +119,6 @@ const EXAMPLE_TOKENS = [
     disabled: true
   }
 ];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function stringValue(value: unknown) {
-  return typeof value === "string" ? value : undefined;
-}
-
-function scanErrorCodeValue(value: unknown): ScanErrorCode | undefined {
-  if (
-    value === "invalid_address" ||
-    value === "no_base_pair" ||
-    value === "api_timeout" ||
-    value === "rate_limit" ||
-    value === "partial_contract_intelligence_failure" ||
-    value === "unexpected_server_error"
-  ) {
-    return value;
-  }
-
-  return undefined;
-}
 
 function emptyBaseScanIntelligence(status: BaseScanStatus = "idle", reason?: BaseScanIntelligence["reason"]): BaseScanIntelligence {
   const unavailableNote =
@@ -311,49 +293,6 @@ function contractIntelligenceNotice(baseScan: BaseScanIntelligence) {
   return "Partial contract intelligence failure. Some BaseScan fields could not be loaded; available fields remain shown.";
 }
 
-function parseScanApiResponse(value: unknown): ScanApiResponse | undefined {
-  if (!isRecord(value)) return undefined;
-  const pair = isRecord(value.pair) ? (value.pair as DexPair) : null;
-  const pairs = Array.isArray(value.pairs)
-    ? value.pairs.filter(isRecord).map((pairValue) => pairValue as DexPair)
-    : pair
-      ? [pair]
-      : [];
-  const baseScan = isRecord(value.baseScan)
-    ? (value.baseScan as BaseScanIntelligence)
-    : emptyBaseScanIntelligence("unavailable", "request-failed");
-  const security = isRecord(value.security)
-    ? (value.security as SecurityIntelligence)
-    : emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
-
-  return {
-    address: stringValue(value.address) ?? "",
-    pair,
-    pairs,
-    baseScan,
-    security,
-    error: stringValue(value.error),
-    errorCode: scanErrorCodeValue(value.errorCode),
-    errors: isRecord(value.errors)
-      ? {
-          dex: stringValue(value.errors.dex),
-          baseScan: stringValue(value.errors.baseScan)
-        }
-      : undefined
-  };
-}
-
-async function readScanApiResponse(response: Response) {
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) return undefined;
-
-  try {
-    return parseScanApiResponse(await response.json());
-  } catch {
-    return undefined;
-  }
-}
-
 function noBasePairMessage() {
   return "No Base pair found for this token. Confirm the contract is deployed on Base and has an indexed DEX pair.";
 }
@@ -417,13 +356,15 @@ class ScanUiError extends Error {
   }
 }
 
-function scanHttpErrorView(status: number, payload?: ScanApiResponse) {
-  if (payload?.errorCode) return scanErrorView(payload.errorCode, payload.error);
-  if (status === 400) return scanErrorView("invalid_address", payload?.error);
-  if (status === 404) return scanErrorView("no_base_pair", payload?.error);
-  if (status === 408 || status === 504) return scanErrorView("api_timeout", payload?.error);
-  if (status === 429) return scanErrorView("rate_limit", payload?.error);
-  return scanErrorView("unexpected_server_error", payload?.error ?? `Scan API returned HTTP ${status}.`);
+function scanHttpErrorView(status: number, payload?: VersionedReportError) {
+  const message = payload?.error.message;
+  const code = payload?.error.code;
+  if (code && code !== "method_not_allowed") return scanErrorView(code, message);
+  if (status === 400) return scanErrorView("invalid_address", message);
+  if (status === 404) return scanErrorView("no_base_pair", message);
+  if (status === 408 || status === 504) return scanErrorView("api_timeout", message);
+  if (status === 429) return scanErrorView("rate_limit", message);
+  return scanErrorView("unexpected_server_error", message ?? `Report API returned HTTP ${status}.`);
 }
 
 function scanRequestErrorView(error: unknown) {
@@ -577,7 +518,7 @@ function scoreTone(level: RiskLevel) {
 }
 
 function storedRiskScoreText(score: number, scoreVersion?: string, riskLevel?: RiskLevel) {
-  if (scoreVersion !== RISK_SCORE_VERSION) return "Rescan";
+  if (scoreVersion !== CURRENT_RISK_SCORE_VERSION) return "Rescan";
   if (riskLevel === "insufficient") return "Low data";
   return `${score}/100`;
 }
@@ -804,45 +745,33 @@ function App() {
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch(`/api/scan?address=${encodeURIComponent(tokenAddress)}`, {
+      const response = await fetch(`/api/v1/report?address=${encodeURIComponent(tokenAddress)}`, {
         signal: controller.signal
       });
-      const payload = await readScanApiResponse(response);
-      const baseScanIntelligence = payload?.baseScan ?? emptyBaseScanIntelligence("unavailable", "request-failed");
-      const securityIntelligence =
-        payload?.security ?? emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
+      const payload = await readReportApiResponse(response);
 
       if (!response.ok) {
-        throw new ScanUiError(scanHttpErrorView(response.status, payload));
+        throw new ScanUiError(
+          scanHttpErrorView(response.status, payload && isVersionedReportError(payload) ? payload : undefined)
+        );
+      }
+
+      if (!payload || !isVersionedRiskReport(payload)) {
+        throw new ScanUiError(
+          scanErrorView("unexpected_server_error", "Report API returned an invalid or unsupported response contract.")
+        );
       }
 
       if (!scanRequestCoordinatorRef.current.isCurrent(requestToken)) return;
-      setBaseScan(baseScanIntelligence);
-
-      if (!payload?.pair) {
-        const view = scanErrorView(payload?.errorCode ?? "no_base_pair", payload?.error);
-        setStatus("error");
-        setErrorState(view);
-        trackEvent("scan_failed", {
-          ...scanEventProperties,
-          error_code: view.code,
-          error_title: view.title
-        });
-        return;
-      }
-
-      const scanResult = calculateRiskReport({
-        pair: payload.pair,
-        pairs: payload.pairs,
-        tokenAddress,
-        baseScan: baseScanIntelligence,
-        security: securityIntelligence
-      });
+      const scanResult = reportToScanResult(payload);
+      const baseScanIntelligence = scanResult.baseScan;
+      const securityIntelligence = scanResult.security;
       const historyItem = buildScanHistoryItem(scanResult, tokenAddress);
       const watchlistItem = buildWatchlistItem(scanResult, tokenAddress);
       const routeAddress = historyItem?.address ?? scanResult.targetToken.address ?? tokenAddress;
 
       setResult(scanResult);
+      setBaseScan(baseScanIntelligence);
       setStatus("success");
       writeTokenRoute(routeAddress, context.source === "route" ? "replace" : "push");
       if (historyItem) {

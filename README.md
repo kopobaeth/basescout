@@ -4,7 +4,7 @@ BaseScout is a Base token risk scanner with a Vercel serverless scan API. Paste 
 
 ## What BaseScout Does
 
-BaseScout combines public DEX Screener market data with optional BaseScan contract intelligence through `/api/scan`.
+BaseScout combines public DEX Screener market data with optional BaseScan contract intelligence through the versioned `/api/v1/report` contract. The legacy `/api/scan` endpoint remains available for compatibility.
 
 It checks:
 
@@ -21,6 +21,29 @@ It checks:
 - Vercel Analytics page tracking and PostHog product events when configured
 
 The result is a first-pass risk score, market list, watchlist controls, and transparent scoring reasons.
+
+## Versioned Report API
+
+`GET /api/v1/report?address=0x...` is the authoritative public read contract for BaseScout. Risk Engine `2.0.0` runs on the server, so the web app and future integrations consume the same score instead of recalculating it in the browser.
+
+A successful response includes:
+
+- `schemaVersion` for the HTTP response contract
+- `scoreVersion` for the scoring algorithm
+- Canonical lowercase token address and Base chain ID `8453`
+- Overall, market, and contract risk; confidence and transparent evidence
+- Primary and alternative Base markets
+- BaseScan and GoPlus intelligence
+- Per-provider availability and timestamps
+- `requestId`, `generatedAt`, and a disclaimer
+
+Errors use the same versioned envelope with a stable code, HTTP status, retryability flag, and request ID. Successful reports use the existing short shared-cache policy; error responses use `private, no-store`.
+
+Example:
+
+```bash
+curl "https://basescout.app/api/v1/report?address=0x940181a94a35a4569e4529a3cdfb74e38fd98631"
+```
 
 ## Why It Exists
 
@@ -134,7 +157,7 @@ npm install
 npm run dev
 ```
 
-For local testing of `/api/scan`, run the app through Vercel dev:
+The Vite development server handles `/api/v1/report` and `/api/scan` locally. To test the exact Vercel Functions runtime, use:
 
 ```bash
 npx vercel dev
@@ -220,7 +243,7 @@ Vercel:
 
 Netlify:
 
-- Requires an equivalent serverless function setup for `/api/scan`.
+- Requires equivalent serverless function routes for `/api/v1/report` and legacy `/api/scan`.
 - Set `ETHERSCAN_API_KEY` in Site configuration if using BaseScan checks.
 - Build command: `npm run build`.
 - Publish directory: `dist`.
@@ -228,12 +251,18 @@ Netlify:
 Static hosting:
 
 - Run `npm run build`.
-- Uploading only `dist` is not enough for v0.4 because `/api/scan` must run on a serverless host.
+- Uploading only `dist` is not enough because the report API must run on a serverless host.
 
 ## Changelog
 
 ### Unreleased
 
+- Added authoritative `GET /api/v1/report` with versioned success and error contracts
+- Moved Risk Engine `2.0.0` execution to the server and migrated the web app to consume its report
+- Added strict runtime validation for report, market, contract, security, evidence, and provider fields
+- Added canonical lowercase addresses, request IDs, provider status metadata, and consistent cache semantics
+- Preserved `/api/scan` as a backwards-compatible normalized provider endpoint
+- Added report contract and handler regression tests
 - Added scan request supersession and navigation cancellation to prevent stale results from overwriting the current route
 - Added a shared server-side provider deadline below the browser timeout
 - Rejected zero-address/native assets as token contracts across manual, routed, API, and Trending scan entry points

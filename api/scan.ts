@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-type DexToken = {
+export type DexToken = {
   address?: string;
   name?: string;
   symbol?: string;
 };
 
-type DexPair = {
+export type DexPair = {
   chainId: string;
   dexId?: string;
   url?: string;
@@ -37,11 +37,11 @@ type DexPair = {
   };
 };
 
-type SecurityCheckStatus = "pass" | "warning" | "critical" | "unknown";
-type SecurityEvidenceLevel = "confirmed" | "inferred" | "unavailable";
-type SecurityProviderStatus = "available" | "partial" | "unavailable";
+export type SecurityCheckStatus = "pass" | "warning" | "critical" | "unknown";
+export type SecurityEvidenceLevel = "confirmed" | "inferred" | "unavailable";
+export type SecurityProviderStatus = "available" | "partial" | "unavailable";
 
-type SecurityCheckKey =
+export type SecurityCheckKey =
   | "honeypot"
   | "buy_tax"
   | "sell_tax"
@@ -56,7 +56,7 @@ type SecurityCheckKey =
   | "owner_privileges"
   | "verified_contract";
 
-type SecurityFinding = {
+export type SecurityFinding = {
   key: SecurityCheckKey;
   label: string;
   status: SecurityCheckStatus;
@@ -66,7 +66,7 @@ type SecurityFinding = {
   value?: string;
 };
 
-type SecurityIntelligence = {
+export type SecurityIntelligence = {
   status: SecurityProviderStatus;
   provider: "goplus";
   checkedAt: number;
@@ -77,9 +77,9 @@ type SecurityIntelligence = {
   note?: string;
 };
 
-type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
-type VerificationStatus = "verified" | "unverified" | "unknown";
-type BaseScanUnavailableReason =
+export type BaseScanStatus = "idle" | "loading" | "available" | "unavailable";
+export type VerificationStatus = "verified" | "unverified" | "unknown";
+export type BaseScanUnavailableReason =
   | "missing-key"
   | "request-failed"
   | "invalid-key"
@@ -88,7 +88,7 @@ type BaseScanUnavailableReason =
   | "plan-restricted"
   | "no-data";
 
-type BaseScanIntelligence = {
+export type BaseScanIntelligence = {
   status: BaseScanStatus;
   reason?: BaseScanUnavailableReason;
   verificationStatus: VerificationStatus;
@@ -104,7 +104,7 @@ type BaseScanIntelligence = {
   note?: string;
 };
 
-type ScanErrorCode =
+export type ScanErrorCode =
   | "invalid_address"
   | "no_base_pair"
   | "api_timeout"
@@ -112,7 +112,7 @@ type ScanErrorCode =
   | "partial_contract_intelligence_failure"
   | "unexpected_server_error";
 
-type ScanApiResponse = {
+export type ScanApiResponse = {
   address: string;
   pair: DexPair | null;
   pairs: DexPair[];
@@ -1148,49 +1148,75 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     const url = requestUrl(request);
-    const address = url.searchParams.get("address")?.trim() ?? "";
+    const result = await scanTokenData(url.searchParams.get("address") ?? "");
+    sendJson(response, result.status, result.payload);
+  } catch (error) {
+    console.error("[BaseScout] Scan API failed", error);
+    sendJson(response, 500, {
+      error: "Unexpected server error. Scan API could not complete the request.",
+      errorCode: "unexpected_server_error"
+    });
+  }
+}
 
-    if (!isTokenContractAddress(address)) {
-      sendJson(response, 400, {
+export type ScanTokenDataResult = {
+  status: number;
+  payload: ScanApiResponse;
+};
+
+export async function scanTokenData(rawAddress: string, now = Date.now()): Promise<ScanTokenDataResult> {
+  const address = rawAddress.trim().toLowerCase();
+
+  if (!isTokenContractAddress(address)) {
+    return {
+      status: 400,
+      payload: {
+        address,
+        pair: null,
+        pairs: [],
+        baseScan: emptyBaseScanIntelligence("unavailable", "no-data"),
+        security: emptySecurityIntelligence("Security checks were not run because the address is invalid."),
         error: "Invalid address. Enter a non-zero 0x token contract with 40 hexadecimal characters.",
         errorCode: "invalid_address"
-      });
-      return;
-    }
+      }
+    };
+  }
 
-    const deadlineAt = Date.now() + SCAN_DEADLINE_MS;
-    const [dexResult, baseScanResult, securityResult] = await Promise.allSettled([
-      fetchDexPairs(address, deadlineAt),
-      fetchBaseScanIntelligence(address, deadlineAt),
-      fetchSecurityIntelligence(address, deadlineAt)
-    ]);
-    const baseScan =
-      baseScanResult.status === "fulfilled"
-        ? baseScanResult.value
-        : emptyBaseScanIntelligence("unavailable", "request-failed");
-    const security =
-      securityResult.status === "fulfilled"
-        ? securityResult.value
-        : emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
-    const errors: ScanApiResponse["errors"] = {};
+  const deadlineAt = now + SCAN_DEADLINE_MS;
+  const [dexResult, baseScanResult, securityResult] = await Promise.allSettled([
+    fetchDexPairs(address, deadlineAt),
+    fetchBaseScanIntelligence(address, deadlineAt),
+    fetchSecurityIntelligence(address, deadlineAt)
+  ]);
+  const baseScan =
+    baseScanResult.status === "fulfilled"
+      ? baseScanResult.value
+      : emptyBaseScanIntelligence("unavailable", "request-failed");
+  const security =
+    securityResult.status === "fulfilled"
+      ? securityResult.value
+      : emptySecurityIntelligence("Security data unavailable. Market and contract scanning still completed.");
+  const errors: ScanApiResponse["errors"] = {};
 
-    if (baseScanResult.status === "rejected") {
-      errors.baseScan = "Partial contract intelligence failure.";
-    } else if (
-      baseScan.status === "unavailable" &&
-      baseScan.reason &&
-      !["missing-key", "no-data"].includes(baseScan.reason)
-    ) {
-      errors.baseScan = "Partial contract intelligence failure.";
-    }
+  if (baseScanResult.status === "rejected") {
+    errors.baseScan = "Partial contract intelligence failure.";
+  } else if (
+    baseScan.status === "unavailable" &&
+    baseScan.reason &&
+    !["missing-key", "no-data"].includes(baseScan.reason)
+  ) {
+    errors.baseScan = "Partial contract intelligence failure.";
+  }
 
-    if (security.status === "unavailable") {
-      errors.security = "Security intelligence unavailable.";
-    }
+  if (security.status === "unavailable") {
+    errors.security = "Security intelligence unavailable.";
+  }
 
-    if (dexResult.status === "rejected") {
-      const details = scanErrorDetails(dexResult.reason);
-      sendJson(response, 502, {
+  if (dexResult.status === "rejected") {
+    const details = scanErrorDetails(dexResult.reason);
+    return {
+      status: 502,
+      payload: {
         address,
         pair: null,
         pairs: [],
@@ -1199,15 +1225,17 @@ export default async function handler(request: IncomingMessage, response: Server
         error: details.error,
         errorCode: details.errorCode,
         errors: { ...errors, dex: details.error }
-      });
-      return;
-    }
+      }
+    };
+  }
 
-    const pairs = dexResult.value;
-    const pair = pairs[0] ?? null;
+  const pairs = dexResult.value;
+  const pair = pairs[0] ?? null;
 
-    if (!pair) {
-      sendJson(response, 404, {
+  if (!pair) {
+    return {
+      status: 404,
+      payload: {
         address,
         pair: null,
         pairs,
@@ -1216,23 +1244,19 @@ export default async function handler(request: IncomingMessage, response: Server
         error: noBasePairMessage(),
         errorCode: "no_base_pair",
         errors: Object.keys(errors).length ? errors : undefined
-      });
-      return;
-    }
+      }
+    };
+  }
 
-    sendJson(response, 200, {
+  return {
+    status: 200,
+    payload: {
       address,
       pair,
       pairs,
       baseScan,
       security,
       errors: Object.keys(errors).length ? errors : undefined
-    });
-  } catch (error) {
-    console.error("[BaseScout] Scan API failed", error);
-    sendJson(response, 500, {
-      error: "Unexpected server error. Scan API could not complete the request.",
-      errorCode: "unexpected_server_error"
-    });
-  }
+    }
+  };
 }

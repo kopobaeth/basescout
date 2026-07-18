@@ -8,7 +8,7 @@ import type {
   ScoreReason,
   SecurityCheckKey,
   SecurityIntelligence
-} from "./types";
+} from "../../src/types";
 
 export const RISK_SCORE_VERSION = "2.0.0";
 

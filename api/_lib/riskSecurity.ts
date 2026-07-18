@@ -1,4 +1,4 @@
-import type { ScoreReason, SecurityFinding, SecurityIntelligence } from "./types";
+import type { ScoreReason, SecurityFinding, SecurityIntelligence } from "../../src/types";
 
 type SecurityRiskOptions = {
   includeVerifiedContract?: boolean;
