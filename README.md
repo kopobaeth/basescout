@@ -45,6 +45,23 @@ Example:
 curl "https://basescout.app/api/v1/report?address=0x940181a94a35a4569e4529a3cdfb74e38fd98631"
 ```
 
+## Base MCP Plugin
+
+[`integrations/base-mcp/plugins/basescout.md`](integrations/base-mcp/plugins/basescout.md) is a contribution-ready read-only plugin specification for the official Base MCP skill.
+
+It teaches an agent to:
+
+- Call BaseScout's versioned report API before an optional Base token interaction
+- Validate the schema, chain, contract address, timestamps, and score version
+- Present detected risk separately from data confidence
+- Treat provider and token metadata as untrusted data
+- Stop on critical findings and require stricter confirmation for high-risk or insufficient-data reports
+- Hand an explicitly confirmed swap to the official Base MCP `swap` tool and Base Account approval flow
+
+BaseScout does not become a second wallet MCP server and never initiates writes itself. The candidate plugin is not yet an official Base integration. Hosted chat surfaces also require `basescout.app` to be added to Base MCP's `web_request` allowlist; coding harnesses can use their own HTTP/fetch capability while the integration is under review.
+
+See [`integrations/base-mcp/README.md`](integrations/base-mcp/README.md) for setup, validation, and publication requirements.
+
 ## Why It Exists
 
 Base has many fast-moving token launches. Traders often need a quick way to identify obvious risk signals before opening a chart, sizing a trade, or doing deeper research.
@@ -258,6 +275,10 @@ Static hosting:
 
 ### Unreleased
 
+- Added a candidate read-only Base MCP plugin that checks BaseScout risk and confidence before optional wallet actions
+- Added strict address, schema, staleness, retry, prompt-injection, and explicit-confirmation rules for agent use
+- Documented the Base MCP allowlist requirement and the separation between BaseScout research and Base Account approvals
+- Added regression checks for the plugin metadata, report contract, and security policy
 - Added authoritative `GET /api/v1/report` with versioned success and error contracts
 - Moved Risk Engine `2.0.0` execution to the server and migrated the web app to consume its report
 - Added strict runtime validation for report, market, contract, security, evidence, and provider fields
