@@ -41,10 +41,12 @@ Until it is allowlisted, a coding harness can use its own HTTP/fetch capability.
 
 This repository contains a candidate plugin, not an official or native Base MCP integration. The current `base/skills` contribution policy limits direct code contributions to the Base core team, so do not open an unsolicited upstream PR. Start with a proposal issue and let maintainers import or explicitly request the plugin diff.
 
+Upstream proposal: [`base/skills#146`](https://github.com/base/skills/issues/146)
+
 Production adoption requires:
 
 1. Validate the plugin against the current Base MCP plugin specification, tool schemas, and BaseScout report contract.
-2. Open a feature proposal in the official [`base/skills`](https://github.com/base/skills) repository with the ready plugin file and live-test evidence.
+2. Track the official [`base/skills#146`](https://github.com/base/skills/issues/146) feature proposal and respond to maintainer review.
 3. Ask maintainers to provision `basescout.app` in the hosted `web_request` allowlist if the plugin is accepted.
 4. Let Base maintainers add the native plugin registry row; partner submissions must not self-register in `SKILL.md`.
 5. Test the accepted version in ChatGPT, Codex, Cursor, Claude, and at least one chat-only surface.
