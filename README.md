@@ -60,6 +60,8 @@ It teaches an agent to:
 
 BaseScout does not become a second wallet MCP server and never initiates writes itself. The candidate plugin is not yet an official Base integration. Hosted chat surfaces also require `basescout.app` to be added to Base MCP's `web_request` allowlist; coding harnesses can use their own HTTP/fetch capability while the integration is under review. Because `base/skills` currently limits direct contributions to the Base core team, upstream adoption starts with a proposal issue rather than an unsolicited PR.
 
+Official upstream proposal: [`base/skills#146`](https://github.com/base/skills/issues/146)
+
 See [`integrations/base-mcp/README.md`](integrations/base-mcp/README.md) for setup, validation, and publication requirements.
 
 ## Why It Exists
@@ -275,6 +277,7 @@ Static hosting:
 
 ### Unreleased
 
+- Opened `base/skills#146` for native plugin review and hosted `basescout.app` allowlisting
 - Aligned the BaseScout plugin with the canonical Base MCP plugin specification, section order, risk enum, routing references, and contribution scope
 - Added a candidate read-only Base MCP plugin that checks BaseScout risk and confidence before optional wallet actions
 - Added strict address, schema, staleness, retry, prompt-injection, and explicit-confirmation rules for agent use
