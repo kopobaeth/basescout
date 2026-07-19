@@ -1,6 +1,6 @@
 # Base MCP Integration
 
-This directory contains a contribution-ready Base MCP plugin specification for BaseScout:
+This directory contains a Base MCP plugin specification for BaseScout:
 
 - [`plugins/basescout.md`](plugins/basescout.md)
 
@@ -39,15 +39,16 @@ Until it is allowlisted, a coding harness can use its own HTTP/fetch capability.
 
 ## Integration status
 
-This repository contains a candidate plugin, not an official or native Base MCP integration.
+This repository contains a candidate plugin, not an official or native Base MCP integration. The current `base/skills` contribution policy limits direct code contributions to the Base core team, so do not open an unsolicited upstream PR. Start with a proposal issue and let maintainers import or explicitly request the plugin diff.
 
 Production adoption requires:
 
-1. Validate the plugin against the current Base MCP tool schemas and BaseScout report contract.
-2. Request `basescout.app` allowlisting for hosted `web_request`.
-3. Submit the plugin to the official [`base/skills`](https://github.com/base/skills) repository.
-4. Test the accepted version in ChatGPT, Codex, Cursor, Claude, and at least one chat-only surface.
-5. Keep the plugin's supported `schemaVersion` and `scoreVersion` aligned with BaseScout releases.
+1. Validate the plugin against the current Base MCP plugin specification, tool schemas, and BaseScout report contract.
+2. Open a feature proposal in the official [`base/skills`](https://github.com/base/skills) repository with the ready plugin file and live-test evidence.
+3. Ask maintainers to provision `basescout.app` in the hosted `web_request` allowlist if the plugin is accepted.
+4. Let Base maintainers add the native plugin registry row; partner submissions must not self-register in `SKILL.md`.
+5. Test the accepted version in ChatGPT, Codex, Cursor, Claude, and at least one chat-only surface.
+6. Keep the plugin's supported `schemaVersion` and `scoreVersion` aligned with BaseScout releases.
 
 ## Safety model
 
