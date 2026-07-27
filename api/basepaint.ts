@@ -5,12 +5,12 @@ import {
   currentBasePaintDay,
   normalizeBasePaintCanvases,
   normalizeBasePaintTheme
-} from "../src/features/basepaint/data";
+} from "../src/features/basepaint/data.js";
 import type {
   BasePaintErrorResponse,
   BasePaintOverviewResponse,
   BasePaintProviderState
-} from "../src/features/basepaint/types";
+} from "../src/features/basepaint/types.js";
 
 const BASEPAINT_GRAPHQL_ENDPOINT = "https://graphql.basepaint.xyz";
 const BASEPAINT_THEME_ENDPOINT = "https://basepaint.xyz/api/theme";
