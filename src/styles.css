@@ -25,6 +25,17 @@ body {
   min-height: 100vh;
 }
 
+.route-loading {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  place-items: center;
+  gap: 12px;
+  color: #5f6b7a;
+  background: #f4f7fb;
+  font-weight: 700;
+}
+
 button,
 input {
   font: inherit;
