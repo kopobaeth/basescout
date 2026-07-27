@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import basePaintHandler from "./api/basepaint";
 import scanHandler from "./api/scan";
 
 export default defineConfig({
@@ -17,6 +18,11 @@ export default defineConfig({
 
           if (pathname === "/api/v1/report") {
             void scanHandler(request, response);
+            return;
+          }
+
+          if (pathname === "/api/basepaint") {
+            void basePaintHandler(request, response);
             return;
           }
 

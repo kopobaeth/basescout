@@ -76,6 +76,10 @@ declare global {
   }
 }
 
+const BasePaintPage = React.lazy(() =>
+  import("./features/basepaint/BasePaintPage").then((module) => ({ default: module.BasePaintPage }))
+);
+
 type ScanStatus = "idle" | "loading" | "success" | "error";
 type CopyState = "idle" | "copied" | "failed";
 type ScanSource = "manual" | "example" | "history" | "route" | "watchlist";
@@ -523,7 +527,28 @@ function storedRiskScoreText(score: number, scoreVersion?: string, riskLevel?: R
   return `${score}/100`;
 }
 
+function isBasePaintPath(pathname = window.location.pathname) {
+  return pathname === "/basepaint" || pathname.startsWith("/basepaint/");
+}
+
 function App() {
+  return isBasePaintPath() ? (
+    <React.Suspense
+      fallback={
+        <main className="route-loading">
+          <Loader2 className="spin" size={28} />
+          <span>Loading BasePaint explorer</span>
+        </main>
+      }
+    >
+      <BasePaintPage />
+    </React.Suspense>
+  ) : (
+    <ScoutApp />
+  );
+}
+
+function ScoutApp() {
   const [routePath, setRoutePath] = useState(() => window.location.pathname);
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState<ScanStatus>("idle");
@@ -952,6 +977,9 @@ function App() {
               Trending
             </a>
           )}
+          <a className="header-action-button nav-link" href="/basepaint">
+            BasePaint
+          </a>
           <a className="header-action-button header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
             <X size={16} />
             <span>Updates on X</span>

@@ -9,6 +9,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/basepaint",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/basepaint/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/token/:address",
       "destination": "/index.html"
     }
