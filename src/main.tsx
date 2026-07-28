@@ -1163,7 +1163,7 @@ function ScoutApp() {
       />
 
       <section className="detail-grid">
-        <article className="panel">
+        <article className="panel risk-breakdown-panel">
           <div className="panel-head">
             <div>
               <p className="section-kicker">Risk breakdown</p>
@@ -1244,7 +1244,7 @@ function ScoutApp() {
 
             {baseScanUrl ? (
               <a
-                className="snapshot-action"
+                className="snapshot-action primary-action"
                 href={baseScanUrl}
                 onClick={() =>
                   trackEvent("open_basescan", {
@@ -1329,28 +1329,6 @@ function ScoutApp() {
               mono={Boolean(activeBaseScan.tokenSupply)}
             />
           </dl>
-
-          <div className="snapshot-actions">
-            {baseScanUrl ? (
-              <a
-                className="snapshot-action primary-action"
-                href={baseScanUrl}
-                onClick={() =>
-                  trackEvent("open_basescan", {
-                    ...tokenAnalyticsProperties(baseScanTokenAddress, selectedToken?.symbol),
-                    location: "intelligence"
-                  })
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open on BaseScan
-                <ExternalLink size={16} />
-              </a>
-            ) : (
-              <span className="snapshot-action primary-action disabled">BaseScan unavailable</span>
-            )}
-          </div>
         </article>
 
         <article className="panel security-panel">
@@ -1593,7 +1571,7 @@ function RiskBreakdown({ result, loading }: { result: ScanResult | null; loading
   const confidence = result.breakdown.confidence;
 
   return (
-    <div className="score-breakdown">
+    <div className="score-breakdown" aria-label="Risk score breakdown" role="region" tabIndex={0}>
       <ScoreBucket
         score={result.breakdown.overall}
         title="Overall Risk Score"
