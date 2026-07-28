@@ -1163,7 +1163,7 @@ function ScoutApp() {
       />
 
       <section className="detail-grid">
-        <article className="panel">
+        <article className="panel risk-breakdown-panel">
           <div className="panel-head">
             <div>
               <p className="section-kicker">Risk breakdown</p>
@@ -1593,7 +1593,7 @@ function RiskBreakdown({ result, loading }: { result: ScanResult | null; loading
   const confidence = result.breakdown.confidence;
 
   return (
-    <div className="score-breakdown">
+    <div className="score-breakdown" aria-label="Risk score breakdown" role="region" tabIndex={0}>
       <ScoreBucket
         score={result.breakdown.overall}
         title="Overall Risk Score"
