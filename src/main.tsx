@@ -1244,7 +1244,7 @@ function ScoutApp() {
 
             {baseScanUrl ? (
               <a
-                className="snapshot-action"
+                className="snapshot-action primary-action"
                 href={baseScanUrl}
                 onClick={() =>
                   trackEvent("open_basescan", {
@@ -1329,28 +1329,6 @@ function ScoutApp() {
               mono={Boolean(activeBaseScan.tokenSupply)}
             />
           </dl>
-
-          <div className="snapshot-actions">
-            {baseScanUrl ? (
-              <a
-                className="snapshot-action primary-action"
-                href={baseScanUrl}
-                onClick={() =>
-                  trackEvent("open_basescan", {
-                    ...tokenAnalyticsProperties(baseScanTokenAddress, selectedToken?.symbol),
-                    location: "intelligence"
-                  })
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open on BaseScan
-                <ExternalLink size={16} />
-              </a>
-            ) : (
-              <span className="snapshot-action primary-action disabled">BaseScan unavailable</span>
-            )}
-          </div>
         </article>
 
         <article className="panel security-panel">
