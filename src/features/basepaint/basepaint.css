@@ -853,6 +853,12 @@
   line-height: 1;
 }
 
+.bp-pulse .bp-section-heading h2 {
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.28);
+}
+
 .bp-section-heading > a {
   gap: 7px;
   color: #91a7da;
