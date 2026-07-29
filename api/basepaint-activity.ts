@@ -7,7 +7,7 @@ const BASEPAINT_GRAPHQL_ENDPOINT = "https://graphql.basepaint.xyz";
 const BASEPAINT_TIMEOUT_MS = 7_000;
 const BASEPAINT_ACTIVITY_CACHE_MS = 20_000;
 const BASEPAINT_ACTIVITY_STALE_MS = 5 * 60_000;
-const BASEPAINT_ACTIVITY_LIMIT = 1_000;
+const BASEPAINT_ACTIVITY_LIMIT = 250;
 const SUCCESS_CACHE_CONTROL = "public, max-age=0, s-maxage=20, stale-while-revalidate=120";
 const ERROR_CACHE_CONTROL = "private, no-store";
 
