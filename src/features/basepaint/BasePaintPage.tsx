@@ -1,20 +1,28 @@
 import { useEffect, useState } from "react";
 import {
+  Activity,
   ArrowLeft,
   ArrowUpRight,
   Brush,
   Clock3,
   ExternalLink,
+  Grid3X3,
   Image as ImageIcon,
   Loader2,
   Palette,
+  Radio,
   RefreshCw,
   Sparkles,
-  Users
+  Users,
+  Zap
 } from "lucide-react";
-import { loadBasePaintOverview } from "./client";
+import { loadBasePaintOverview, loadBasePaintPulse } from "./client";
 import { basePaintArtworkUrl, basePaintCanvasUrl } from "./data";
-import type { BasePaintCanvas, BasePaintOverviewResponse } from "./types";
+import type {
+  BasePaintCanvas,
+  BasePaintOverviewResponse,
+  BasePaintPulseResponse
+} from "./types";
 import "./basepaint.css";
 
 type BasePaintLoadStatus = "loading" | "success" | "error";
@@ -45,6 +53,25 @@ function shortIdentity(value?: string) {
   if (!value) return "Unknown";
   if (!value.startsWith("0x") || value.length < 14) return value;
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
+}
+
+function timestampText(value?: number | null) {
+  if (!value) return "No recent strokes";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "UTC"
+  }).format(value);
+}
+
+function pulseLabel(pulse: BasePaintPulseResponse | null) {
+  const fiveMinutes = pulse?.windows.find((window) => window.minutes === 5);
+  if (!pulse?.latestStrokeAt || Date.now() - pulse.latestStrokeAt > 10 * 60_000) return "Quiet";
+  if ((fiveMinutes?.pixels ?? 0) >= 1_000) return "High activity";
+  if ((fiveMinutes?.pixels ?? 0) >= 200) return "Active";
+  return "Steady";
 }
 
 function phaseLabel(day: number, currentDay: number) {
@@ -136,9 +163,200 @@ function CanvasCard({ canvas, currentDay }: { canvas: BasePaintCanvas; currentDa
   );
 }
 
+function CanvasPulse({
+  error,
+  onRetry,
+  palette,
+  pulse,
+  status
+}: {
+  error: string;
+  onRetry: () => void;
+  palette: string[];
+  pulse: BasePaintPulseResponse | null;
+  status: BasePaintLoadStatus;
+}) {
+  const fiveMinutes = pulse?.windows.find((window) => window.minutes === 5);
+  const thirtyMinutes = pulse?.windows.find((window) => window.minutes === 30);
+  const sixtyMinutes = pulse?.windows.find((window) => window.minutes === 60);
+  const cells = new Map(pulse?.heatmap.cells.map((cell) => [`${cell.x}:${cell.y}`, cell.pixels]) ?? []);
+  const maxPixels = Math.max(1, ...cells.values());
+  const dominantColor =
+    pulse?.dominantPaletteIndex !== null && pulse?.dominantPaletteIndex !== undefined
+      ? palette[pulse.dominantPaletteIndex]
+      : undefined;
+
+  return (
+    <section className="bp-pulse" id="pulse">
+      <div className="bp-section-heading">
+        <div>
+          <span>Live onchain activity</span>
+          <h2>Canvas Pulse</h2>
+        </div>
+        <div className={`bp-pulse-status ${status}`}>
+          <Radio aria-hidden="true" size={14} />
+          {status === "loading"
+            ? "Connecting"
+            : status === "error"
+              ? "Pulse unavailable"
+              : `${pulseLabel(pulse)} · ${pulse?.stale ? "cached" : "live"}`}
+        </div>
+      </div>
+
+      {status === "error" ? (
+        <div className="bp-pulse-error" role="status">
+          <div>
+            <Activity size={22} />
+            <span>
+              <strong>Live activity could not be loaded</strong>
+              {error}
+            </span>
+          </div>
+          <button type="button" onClick={onRetry}>
+            <RefreshCw size={14} />
+            Retry pulse
+          </button>
+        </div>
+      ) : (
+        <>
+          <dl className="bp-pulse-metrics" aria-busy={status === "loading"}>
+            <div>
+              <Zap aria-hidden="true" size={18} />
+              <dt>Pixels · 5 min</dt>
+              <dd>{pulse ? numberText(fiveMinutes?.pixels ?? 0) : "—"}</dd>
+            </div>
+            <div>
+              <Users aria-hidden="true" size={18} />
+              <dt>Artists · 30 min</dt>
+              <dd>{pulse ? numberText(thirtyMinutes?.artists ?? 0) : "—"}</dd>
+            </div>
+            <div>
+              <Brush aria-hidden="true" size={18} />
+              <dt>Strokes · 60 min</dt>
+              <dd>{pulse ? numberText(sixtyMinutes?.strokes ?? 0) : "—"}</dd>
+            </div>
+            <div>
+              <Clock3 aria-hidden="true" size={18} />
+              <dt>Latest stroke · UTC</dt>
+              <dd>{pulse ? timestampText(pulse.latestStrokeAt) : "—"}</dd>
+            </div>
+          </dl>
+
+          <div className="bp-pulse-grid">
+            <article className="bp-heatmap-panel">
+              <div className="bp-pulse-card-heading">
+                <div>
+                  <Grid3X3 size={17} />
+                  <span>
+                    <strong>Activity heatmap</strong>
+                    Last 60 minutes
+                  </span>
+                </div>
+                {dominantColor ? (
+                  <span className="bp-dominant-color">
+                    <i style={{ backgroundColor: dominantColor }} />
+                    Most used
+                  </span>
+                ) : null}
+              </div>
+
+              {status === "loading" ? (
+                <div className="bp-pulse-loading">
+                  <Loader2 className="spin" size={25} />
+                  Reading BasePaint strokes
+                </div>
+              ) : (
+                <div
+                  className="bp-heatmap"
+                  role="img"
+                  aria-label={`Eight by eight activity heatmap for the last hour with ${numberText(
+                    sixtyMinutes?.pixels ?? 0
+                  )} pixels`}
+                >
+                  {Array.from({ length: 64 }, (_, index) => {
+                    const x = index % 8;
+                    const y = Math.floor(index / 8);
+                    const pixels = cells.get(`${x}:${y}`) ?? 0;
+                    const intensity = pixels ? 0.18 + (pixels / maxPixels) * 0.82 : 0.035;
+                    return (
+                      <span
+                        aria-hidden="true"
+                        key={`${x}:${y}`}
+                        style={{ opacity: intensity }}
+                        title={`${pixels} pixels`}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="bp-heatmap-legend">
+                <span>Less activity</span>
+                <i />
+                <span>More activity</span>
+              </div>
+            </article>
+
+            <article className="bp-artists-panel">
+              <div className="bp-pulse-card-heading">
+                <div>
+                  <Users size={17} />
+                  <span>
+                    <strong>Active artists</strong>
+                    Ranked by pixels · 60 min
+                  </span>
+                </div>
+              </div>
+
+              {status === "loading" ? (
+                <div className="bp-pulse-loading">
+                  <Loader2 className="spin" size={25} />
+                  Finding contributors
+                </div>
+              ) : pulse?.topArtists.length ? (
+                <ol className="bp-artist-list">
+                  {pulse.topArtists.map((artist, index) => (
+                    <li key={artist.address}>
+                      <span className="bp-artist-rank">{String(index + 1).padStart(2, "0")}</span>
+                      <a
+                        href={`https://basescan.org/address/${artist.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {shortIdentity(artist.address)}
+                        <ArrowUpRight size={13} />
+                      </a>
+                      <span>
+                        <strong>{numberText(artist.pixels)} px</strong>
+                        {numberText(artist.strokes)} strokes
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="bp-pulse-empty">
+                  The canvas has been quiet during the last hour. Pulse will update automatically.
+                </div>
+              )}
+            </article>
+          </div>
+
+          {pulse?.truncated ? (
+            <p className="bp-pulse-note">Very high activity: Pulse is based on the latest 1,000 strokes.</p>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function BasePaintPage() {
   const [data, setData] = useState<BasePaintOverviewResponse | null>(null);
   const [error, setError] = useState("");
+  const [pulse, setPulse] = useState<BasePaintPulseResponse | null>(null);
+  const [pulseError, setPulseError] = useState("");
+  const [pulseReloadKey, setPulseReloadKey] = useState(0);
+  const [pulseStatus, setPulseStatus] = useState<BasePaintLoadStatus>("loading");
   const [reloadKey, setReloadKey] = useState(0);
   const [status, setStatus] = useState<BasePaintLoadStatus>("loading");
 
@@ -191,6 +409,44 @@ export function BasePaintPage() {
     return () => controller.abort();
   }, [reloadKey]);
 
+  useEffect(() => {
+    let active = true;
+    let inFlight = false;
+    let requestController: AbortController | null = null;
+
+    const refreshPulse = async (initial: boolean) => {
+      if (inFlight) return;
+      inFlight = true;
+      requestController = new AbortController();
+      if (initial) setPulseStatus("loading");
+      setPulseError("");
+
+      try {
+        const activity = await loadBasePaintPulse(requestController.signal);
+        if (!active) return;
+        setPulse(activity);
+        setPulseStatus("success");
+      } catch (requestError: unknown) {
+        if (!active || requestController.signal.aborted) return;
+        setPulseError(
+          requestError instanceof Error ? requestError.message : "BasePaint activity could not be loaded."
+        );
+        setPulseStatus("error");
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void refreshPulse(true);
+    const intervalId = window.setInterval(() => void refreshPulse(false), 30_000);
+
+    return () => {
+      active = false;
+      requestController?.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [pulseReloadKey]);
+
   const currentCanvas = data?.canvases.find((canvas) => canvas.day === data.currentDay);
   const collectCanvas = data?.canvases.find((canvas) => canvas.day === data.currentDay - 1);
   const galleryCanvases = data?.canvases.filter((canvas) => canvas.day < data.currentDay).slice(0, 12) ?? [];
@@ -217,6 +473,7 @@ export function BasePaintPage() {
             <a className="active" href="#today">
               Today
             </a>
+            <a href="#pulse">Pulse</a>
             <a href="#gallery">Gallery</a>
             <a href="https://basepaint.xyz/" target="_blank" rel="noopener noreferrer">
               BasePaint <ExternalLink size={14} />
@@ -238,6 +495,10 @@ export function BasePaintPage() {
               <>
                 <ProviderBadge label="Indexer" status={data.providers.indexer.status} />
                 <ProviderBadge label="Theme API" status={data.providers.theme.status} />
+                <ProviderBadge
+                  label="Pulse"
+                  status={pulseStatus === "success" ? "available" : "unavailable"}
+                />
               </>
             ) : (
               <span className="bp-provider pending">
@@ -388,6 +649,14 @@ export function BasePaintPage() {
             </a>
           </section>
         ) : null}
+
+        <CanvasPulse
+          error={pulseError}
+          onRetry={() => setPulseReloadKey((key) => key + 1)}
+          palette={themePalette}
+          pulse={pulse}
+          status={pulseStatus}
+        />
 
         <section className="bp-gallery" id="gallery">
           <div className="bp-section-heading">
