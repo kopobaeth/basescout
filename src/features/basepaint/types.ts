@@ -44,6 +44,46 @@ export type BasePaintOverviewResponse = {
   canvases: BasePaintCanvas[];
 };
 
+export type BasePaintPulseWindow = {
+  minutes: 5 | 30 | 60;
+  artists: number;
+  strokes: number;
+  pixels: number;
+};
+
+export type BasePaintPulseArtist = {
+  address: string;
+  pixels: number;
+  strokes: number;
+  lastActiveAt: number;
+};
+
+export type BasePaintHeatCell = {
+  x: number;
+  y: number;
+  pixels: number;
+};
+
+export type BasePaintPulseResponse = {
+  source: "basepaint";
+  attribution: "Public onchain data by BasePaint";
+  generatedAt: number;
+  currentDay: number;
+  rangeMinutes: 60;
+  refreshSeconds: number;
+  stale: boolean;
+  truncated: boolean;
+  latestStrokeAt: number | null;
+  dominantPaletteIndex: number | null;
+  windows: [BasePaintPulseWindow, BasePaintPulseWindow, BasePaintPulseWindow];
+  topArtists: BasePaintPulseArtist[];
+  heatmap: {
+    gridSize: 8;
+    canvasSize: number;
+    cells: BasePaintHeatCell[];
+  };
+};
+
 export type BasePaintErrorResponse = {
   error: string;
   errorCode: "provider_error" | "method_not_allowed";
