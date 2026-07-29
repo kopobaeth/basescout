@@ -342,7 +342,7 @@ function CanvasPulse({
           </div>
 
           {pulse?.truncated ? (
-            <p className="bp-pulse-note">Very high activity: Pulse is based on the latest 1,000 strokes.</p>
+            <p className="bp-pulse-note">Very high activity: Pulse is based on the latest 250 strokes.</p>
           ) : null}
         </>
       )}
