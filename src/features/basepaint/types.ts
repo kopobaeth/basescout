@@ -84,7 +84,42 @@ export type BasePaintPulseResponse = {
   };
 };
 
+export type BasePaintArtistContribution = {
+  day: number;
+  pixelsCount: number;
+};
+
+export type BasePaintArtistBrush = {
+  id: number;
+  strength: number;
+  streak: number;
+  lastUsedDay: number | null;
+  lastUsedAt: number | null;
+};
+
+export type BasePaintArtistResponse = {
+  source: "basepaint";
+  attribution: "Public onchain data by BasePaint";
+  generatedAt: number;
+  currentDay: number;
+  cacheSeconds: number;
+  address: string;
+  totalPixels: number;
+  totalDaysPainted: number;
+  streak: number;
+  longestStreak: number;
+  lastPaintedDay: number | null;
+  totalEarnedWei: string;
+  totalWithdrawnWei: string;
+  recentContributions: BasePaintArtistContribution[];
+  brushes: BasePaintArtistBrush[];
+};
+
 export type BasePaintErrorResponse = {
   error: string;
-  errorCode: "provider_error" | "method_not_allowed";
+  errorCode:
+    | "provider_error"
+    | "method_not_allowed"
+    | "invalid_address"
+    | "artist_not_found";
 };
