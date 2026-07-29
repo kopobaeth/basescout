@@ -1,6 +1,8 @@
 import { isBasePaintOverviewResponse } from "./data";
+import { isBasePaintArtistResponse } from "./artist";
 import { isBasePaintPulseResponse } from "./pulse";
 import type {
+  BasePaintArtistResponse,
   BasePaintErrorResponse,
   BasePaintOverviewResponse,
   BasePaintPulseResponse
@@ -59,6 +61,39 @@ export async function loadBasePaintPulse(signal?: AbortSignal): Promise<BasePain
     }
     if (!isBasePaintPulseResponse(payload)) {
       throw new Error("BasePaint activity returned an unexpected response.");
+    }
+
+    return payload;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abortFromParent);
+  }
+}
+
+export async function loadBasePaintArtist(
+  address: string,
+  signal?: AbortSignal
+): Promise<BasePaintArtistResponse> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), BASEPAINT_REQUEST_TIMEOUT_MS);
+  const abortFromParent = () => controller.abort();
+  signal?.addEventListener("abort", abortFromParent, { once: true });
+
+  try {
+    const response = await fetch(`/api/basepaint-artist?address=${encodeURIComponent(address)}`, {
+      headers: {
+        Accept: "application/json"
+      },
+      signal: controller.signal
+    });
+    const payload = (await response.json()) as unknown;
+
+    if (!response.ok) {
+      const error = payload as Partial<BasePaintErrorResponse>;
+      throw new Error(error.error ?? `BasePaint artist request returned HTTP ${response.status}.`);
+    }
+    if (!isBasePaintArtistResponse(payload)) {
+      throw new Error("BasePaint artist data returned an unexpected response.");
     }
 
     return payload;
