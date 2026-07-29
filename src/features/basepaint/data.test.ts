@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import {
   BASEPAINT_DAY_DURATION_MS,
   BASEPAINT_DAY_ONE_START_MS,
+  basePaintArtistRouteAddress,
+  basePaintArtistUrl,
   basePaintArtworkUrl,
   basePaintCanvasUrl,
   basePaintPhaseEndsAt,
@@ -86,5 +88,14 @@ assert.equal(canvases[0].day, 1083);
 assert.equal(canvases[1].totalMints, 75);
 assert.equal(basePaintArtworkUrl(7), "https://basepaint.net/v3/0007.png");
 assert.equal(basePaintCanvasUrl(1077), "https://basepaint.xyz/canvas/1077");
+assert.equal(
+  basePaintArtistUrl("0x1111111111111111111111111111111111111111"),
+  "/basepaint/artist/0x1111111111111111111111111111111111111111"
+);
+assert.equal(
+  basePaintArtistRouteAddress("/basepaint/artist/0x1111111111111111111111111111111111111111"),
+  "0x1111111111111111111111111111111111111111"
+);
+assert.equal(basePaintArtistRouteAddress("/basepaint"), undefined);
 
 console.log("BasePaint data tests passed");
