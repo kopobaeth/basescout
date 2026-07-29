@@ -1,5 +1,10 @@
 import { isBasePaintOverviewResponse } from "./data";
-import type { BasePaintErrorResponse, BasePaintOverviewResponse } from "./types";
+import { isBasePaintPulseResponse } from "./pulse";
+import type {
+  BasePaintErrorResponse,
+  BasePaintOverviewResponse,
+  BasePaintPulseResponse
+} from "./types";
 
 const BASEPAINT_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -24,6 +29,36 @@ export async function loadBasePaintOverview(signal?: AbortSignal): Promise<BaseP
     }
     if (!isBasePaintOverviewResponse(payload)) {
       throw new Error("BasePaint returned an unexpected response.");
+    }
+
+    return payload;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abortFromParent);
+  }
+}
+
+export async function loadBasePaintPulse(signal?: AbortSignal): Promise<BasePaintPulseResponse> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), BASEPAINT_REQUEST_TIMEOUT_MS);
+  const abortFromParent = () => controller.abort();
+  signal?.addEventListener("abort", abortFromParent, { once: true });
+
+  try {
+    const response = await fetch("/api/basepaint-activity", {
+      headers: {
+        Accept: "application/json"
+      },
+      signal: controller.signal
+    });
+    const payload = (await response.json()) as unknown;
+
+    if (!response.ok) {
+      const error = payload as Partial<BasePaintErrorResponse>;
+      throw new Error(error.error ?? `BasePaint activity request returned HTTP ${response.status}.`);
+    }
+    if (!isBasePaintPulseResponse(payload)) {
+      throw new Error("BasePaint activity returned an unexpected response.");
     }
 
     return payload;
