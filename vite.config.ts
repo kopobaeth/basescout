@@ -1,5 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import basePaintActivityHandler from "./api/basepaint-activity";
+import basePaintArtistHandler from "./api/basepaint-artist";
 import basePaintHandler from "./api/basepaint";
 import scanHandler from "./api/scan";
 
@@ -23,6 +25,16 @@ export default defineConfig({
 
           if (pathname === "/api/basepaint") {
             void basePaintHandler(request, response);
+            return;
+          }
+
+          if (pathname === "/api/basepaint-activity") {
+            void basePaintActivityHandler(request, response);
+            return;
+          }
+
+          if (pathname === "/api/basepaint-artist") {
+            void basePaintArtistHandler(request, response);
             return;
           }
 

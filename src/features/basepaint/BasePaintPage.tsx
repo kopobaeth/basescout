@@ -16,8 +16,15 @@ import {
   Users,
   Zap
 } from "lucide-react";
+import { BasePaintArtistPage } from "./BasePaintArtistPage";
 import { loadBasePaintOverview, loadBasePaintPulse } from "./client";
-import { basePaintArtworkUrl, basePaintCanvasUrl } from "./data";
+import {
+  basePaintArtistRouteAddress,
+  basePaintArtistUrl,
+  basePaintArtworkUrl,
+  basePaintCanvasUrl
+} from "./data";
+import { ethFromWei, numberText, shortIdentity } from "./format";
 import type {
   BasePaintCanvas,
   BasePaintOverviewResponse,
@@ -29,10 +36,6 @@ type BasePaintLoadStatus = "loading" | "success" | "error";
 
 const CURRENT_CANVAS_IMAGE = "https://basepaint.xyz/api/art/image?day=painting&scale=1";
 
-function numberText(value: number) {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
-}
-
 function usdFromUsd8(value: string) {
   const amount = Number(value) / 100_000_000;
   if (!Number.isFinite(amount) || amount <= 0) return "—";
@@ -41,18 +44,6 @@ function usdFromUsd8(value: string) {
     currency: "USD",
     maximumFractionDigits: amount < 100 ? 2 : 0
   }).format(amount);
-}
-
-function ethFromWei(value: string) {
-  const amount = Number(value) / 1_000_000_000_000_000_000;
-  if (!Number.isFinite(amount) || amount <= 0) return "—";
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(amount)} ETH`;
-}
-
-function shortIdentity(value?: string) {
-  if (!value) return "Unknown";
-  if (!value.startsWith("0x") || value.length < 14) return value;
-  return `${value.slice(0, 6)}…${value.slice(-4)}`;
 }
 
 function timestampText(value?: number | null) {
@@ -318,11 +309,7 @@ function CanvasPulse({
                   {pulse.topArtists.map((artist, index) => (
                     <li key={artist.address}>
                       <span className="bp-artist-rank">{String(index + 1).padStart(2, "0")}</span>
-                      <a
-                        href={`https://basescan.org/address/${artist.address}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <a href={basePaintArtistUrl(artist.address)}>
                         {shortIdentity(artist.address)}
                         <ArrowUpRight size={13} />
                       </a>
@@ -350,7 +337,7 @@ function CanvasPulse({
   );
 }
 
-export function BasePaintPage() {
+function BasePaintOverviewPage() {
   const [data, setData] = useState<BasePaintOverviewResponse | null>(null);
   const [error, setError] = useState("");
   const [pulse, setPulse] = useState<BasePaintPulseResponse | null>(null);
@@ -692,5 +679,14 @@ export function BasePaintPage() {
         </footer>
       </div>
     </main>
+  );
+}
+
+export function BasePaintPage() {
+  const artistAddress = basePaintArtistRouteAddress(window.location.pathname);
+  return artistAddress !== undefined ? (
+    <BasePaintArtistPage address={artistAddress} />
+  ) : (
+    <BasePaintOverviewPage />
   );
 }

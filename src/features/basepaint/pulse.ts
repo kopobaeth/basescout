@@ -55,7 +55,7 @@ function normalizeStroke(value: unknown, currentDay: number): BasePaintStroke | 
 
   return {
     canvasId,
-    accountId: accountId.toLowerCase(),
+    accountId,
     data,
     timestamp
   };
