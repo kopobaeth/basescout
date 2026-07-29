@@ -118,6 +118,23 @@ export function basePaintCanvasUrl(day: number) {
   return `https://basepaint.xyz/canvas/${Math.max(1, Math.trunc(day))}`;
 }
 
+export function basePaintArtistUrl(address: string) {
+  return `/basepaint/artist/${encodeURIComponent(address)}`;
+}
+
+export function basePaintArtistRouteAddress(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length !== 3 || segments[0] !== "basepaint" || segments[1] !== "artist") {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(segments[2]);
+  } catch {
+    return "";
+  }
+}
+
 export function isBasePaintOverviewResponse(value: unknown): value is BasePaintOverviewResponse {
   if (!isRecord(value) || value.source !== "basepaint") return false;
   if (!Number.isInteger(value.currentDay) || !Number.isFinite(value.generatedAt) || !Number.isFinite(value.phaseEndsAt)) {
