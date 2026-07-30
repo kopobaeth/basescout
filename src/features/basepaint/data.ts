@@ -1,4 +1,9 @@
-import type { BasePaintCanvas, BasePaintOverviewResponse, BasePaintTheme } from "./types";
+import type {
+  BasePaintCanvas,
+  BasePaintCanvasPhase,
+  BasePaintOverviewResponse,
+  BasePaintTheme
+} from "./types";
 
 export const BASEPAINT_DAY_ONE_START_MS = 1_691_599_315_000;
 export const BASEPAINT_DAY_DURATION_MS = 86_400_000;
@@ -40,6 +45,12 @@ export function currentBasePaintDay(nowMs = Date.now()) {
 
 export function basePaintPhaseEndsAt(day: number) {
   return BASEPAINT_DAY_ONE_START_MS + Math.max(1, Math.trunc(day)) * BASEPAINT_DAY_DURATION_MS;
+}
+
+export function basePaintCanvasPhase(day: number, currentDay: number): BasePaintCanvasPhase {
+  if (day === currentDay) return "painting";
+  if (day === currentDay - 1) return "collecting";
+  return "complete";
 }
 
 export function normalizeBasePaintPalette(value: unknown) {
@@ -116,6 +127,28 @@ export function basePaintArtworkUrl(day: number) {
 
 export function basePaintCanvasUrl(day: number) {
   return `https://basepaint.xyz/canvas/${Math.max(1, Math.trunc(day))}`;
+}
+
+export function basePaintCanvasScoutUrl(day: number) {
+  return `/basepaint/canvas/${Math.max(1, Math.trunc(day))}`;
+}
+
+export function basePaintCanvasRouteDay(pathname: string): number | null | undefined {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length !== 3 || segments[0] !== "basepaint" || segments[1] !== "canvas") {
+    return undefined;
+  }
+
+  let value: string;
+  try {
+    value = decodeURIComponent(segments[2]);
+  } catch {
+    return null;
+  }
+
+  if (!/^[1-9]\d*$/.test(value)) return null;
+  const day = Number(value);
+  return Number.isSafeInteger(day) ? day : null;
 }
 
 export function basePaintArtistUrl(address: string) {
