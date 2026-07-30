@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import {
   BASEPAINT_DAY_DURATION_MS,
   BASEPAINT_DAY_ONE_START_MS,
+  basePaintCanvasPhase,
+  basePaintCanvasRouteDay,
+  basePaintCanvasScoutUrl,
   basePaintArtistRouteAddress,
   basePaintArtistUrl,
   basePaintArtworkUrl,
@@ -17,6 +20,9 @@ assert.equal(currentBasePaintDay(BASEPAINT_DAY_ONE_START_MS), 1);
 assert.equal(currentBasePaintDay(BASEPAINT_DAY_ONE_START_MS + BASEPAINT_DAY_DURATION_MS - 1), 1);
 assert.equal(currentBasePaintDay(BASEPAINT_DAY_ONE_START_MS + BASEPAINT_DAY_DURATION_MS), 2);
 assert.equal(basePaintPhaseEndsAt(1), BASEPAINT_DAY_ONE_START_MS + BASEPAINT_DAY_DURATION_MS);
+assert.equal(basePaintCanvasPhase(1086, 1086), "painting");
+assert.equal(basePaintCanvasPhase(1085, 1086), "collecting");
+assert.equal(basePaintCanvasPhase(1084, 1086), "complete");
 
 assert.deepEqual(
   normalizeBasePaintPalette(["#0042E0", "javascript:alert(1)", "#fffcee", "#0042E0"]),
@@ -88,6 +94,10 @@ assert.equal(canvases[0].day, 1083);
 assert.equal(canvases[1].totalMints, 75);
 assert.equal(basePaintArtworkUrl(7), "https://basepaint.net/v3/0007.png");
 assert.equal(basePaintCanvasUrl(1077), "https://basepaint.xyz/canvas/1077");
+assert.equal(basePaintCanvasScoutUrl(1077), "/basepaint/canvas/1077");
+assert.equal(basePaintCanvasRouteDay("/basepaint/canvas/1077"), 1077);
+assert.equal(basePaintCanvasRouteDay("/basepaint/canvas/nope"), null);
+assert.equal(basePaintCanvasRouteDay("/basepaint"), undefined);
 assert.equal(
   basePaintArtistUrl("0x1111111111111111111111111111111111111111"),
   "/basepaint/artist/0x1111111111111111111111111111111111111111"
