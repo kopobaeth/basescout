@@ -5,12 +5,26 @@ import { isBasePaintPulseResponse } from "./pulse";
 import type {
   BasePaintArtistResponse,
   BasePaintCanvasResponse,
-  BasePaintErrorResponse,
   BasePaintOverviewResponse,
   BasePaintPulseResponse
 } from "./types";
 
 const BASEPAINT_REQUEST_TIMEOUT_MS = 10_000;
+
+function apiErrorMessage(value: unknown, fallback: string) {
+  if (!value || typeof value !== "object") return fallback;
+  const payload = value as Record<string, unknown>;
+  if (typeof payload.error === "string" && payload.error.trim()) return payload.error;
+  if (
+    payload.error &&
+    typeof payload.error === "object" &&
+    typeof (payload.error as Record<string, unknown>).message === "string"
+  ) {
+    return (payload.error as Record<string, unknown>).message as string;
+  }
+  if (typeof payload.message === "string" && payload.message.trim()) return payload.message;
+  return fallback;
+}
 
 export async function loadBasePaintOverview(signal?: AbortSignal): Promise<BasePaintOverviewResponse> {
   const controller = new AbortController();
@@ -28,8 +42,9 @@ export async function loadBasePaintOverview(signal?: AbortSignal): Promise<BaseP
     const payload = (await response.json()) as unknown;
 
     if (!response.ok) {
-      const error = payload as Partial<BasePaintErrorResponse>;
-      throw new Error(error.error ?? `BasePaint data request returned HTTP ${response.status}.`);
+      throw new Error(
+        apiErrorMessage(payload, `BasePaint data request returned HTTP ${response.status}.`)
+      );
     }
     if (!isBasePaintOverviewResponse(payload)) {
       throw new Error("BasePaint returned an unexpected response.");
@@ -58,8 +73,9 @@ export async function loadBasePaintPulse(signal?: AbortSignal): Promise<BasePain
     const payload = (await response.json()) as unknown;
 
     if (!response.ok) {
-      const error = payload as Partial<BasePaintErrorResponse>;
-      throw new Error(error.error ?? `BasePaint activity request returned HTTP ${response.status}.`);
+      throw new Error(
+        apiErrorMessage(payload, `BasePaint activity request returned HTTP ${response.status}.`)
+      );
     }
     if (!isBasePaintPulseResponse(payload)) {
       throw new Error("BasePaint activity returned an unexpected response.");
@@ -91,8 +107,9 @@ export async function loadBasePaintArtist(
     const payload = (await response.json()) as unknown;
 
     if (!response.ok) {
-      const error = payload as Partial<BasePaintErrorResponse>;
-      throw new Error(error.error ?? `BasePaint artist request returned HTTP ${response.status}.`);
+      throw new Error(
+        apiErrorMessage(payload, `BasePaint artist request returned HTTP ${response.status}.`)
+      );
     }
     if (!isBasePaintArtistResponse(payload)) {
       throw new Error("BasePaint artist data returned an unexpected response.");
@@ -124,8 +141,9 @@ export async function loadBasePaintCanvas(
     const payload = (await response.json()) as unknown;
 
     if (!response.ok) {
-      const error = payload as Partial<BasePaintErrorResponse>;
-      throw new Error(error.error ?? `BasePaint canvas request returned HTTP ${response.status}.`);
+      throw new Error(
+        apiErrorMessage(payload, `BasePaint canvas request returned HTTP ${response.status}.`)
+      );
     }
     if (!isBasePaintCanvasResponse(payload)) {
       throw new Error("BasePaint canvas data returned an unexpected response.");
