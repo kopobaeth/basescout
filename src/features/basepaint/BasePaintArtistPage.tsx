@@ -17,27 +17,18 @@ import {
 } from "lucide-react";
 import { loadBasePaintArtist } from "./client";
 import {
-  BASEPAINT_DAY_DURATION_MS,
-  BASEPAINT_DAY_ONE_START_MS,
   basePaintArtworkUrl,
-  basePaintCanvasUrl
+  basePaintCanvasScoutUrl
 } from "./data";
-import { ethFromWei, numberText, shortIdentity } from "./format";
+import {
+  basePaintDayDateText,
+  ethFromWei,
+  numberText,
+  shortIdentity
+} from "./format";
 import type { BasePaintArtistResponse } from "./types";
 
 type ArtistLoadStatus = "loading" | "success" | "error";
-
-const DAY_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC"
-});
-
-function dayDateText(day: number) {
-  const date = new Date(BASEPAINT_DAY_ONE_START_MS + (Math.max(1, day) - 1) * BASEPAINT_DAY_DURATION_MS);
-  return DAY_DATE_FORMATTER.format(date);
-}
 
 function dayLabel(day: number | null) {
   return day ? `Day #${day}` : "—";
@@ -277,9 +268,7 @@ export function BasePaintArtistPage({ address }: { address: string }) {
                   {artist.recentContributions.map((contribution) => (
                     <article className="bp-contribution-card" key={contribution.day}>
                       <a
-                        href={basePaintCanvasUrl(contribution.day)}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={basePaintCanvasScoutUrl(contribution.day)}
                       >
                         <img
                           alt={`BasePaint day ${contribution.day}`}
@@ -289,7 +278,7 @@ export function BasePaintArtistPage({ address }: { address: string }) {
                         />
                       </a>
                       <div>
-                        <span>{dayDateText(contribution.day)}</span>
+                        <span>{basePaintDayDateText(contribution.day)}</span>
                         <strong>Day #{contribution.day}</strong>
                         <p>{numberText(contribution.pixelsCount)} pixels contributed</p>
                       </div>
