@@ -2,7 +2,7 @@ import {
   basePaintCanvasPhase,
   basePaintPhaseEndsAt,
   normalizeBasePaintCanvas
-} from "./data";
+} from "./data.js";
 import type {
   BasePaintCanvasContributor,
   BasePaintCanvasResponse,
