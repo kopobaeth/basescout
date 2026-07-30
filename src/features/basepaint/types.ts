@@ -115,11 +115,44 @@ export type BasePaintArtistResponse = {
   brushes: BasePaintArtistBrush[];
 };
 
+export type BasePaintCanvasPhase = "painting" | "collecting" | "complete";
+
+export type BasePaintCanvasContributor = {
+  address: string;
+  pixelsCount: number;
+};
+
+export type BasePaintCanvasStroke = {
+  id: string;
+  address: string;
+  brushId: number;
+  pixelsCount: number;
+  transactionHash: string;
+  paintedAt: number;
+};
+
+export type BasePaintCanvasResponse = {
+  source: "basepaint";
+  attribution: "Public onchain data by BasePaint";
+  artworkLicense: "CC0";
+  generatedAt: number;
+  currentDay: number;
+  cacheSeconds: number;
+  phase: BasePaintCanvasPhase;
+  phaseEndsAt: number | null;
+  canvas: BasePaintCanvas;
+  topContributors: BasePaintCanvasContributor[];
+  recentStrokes: BasePaintCanvasStroke[];
+  recentStrokeLimit: number;
+};
+
 export type BasePaintErrorResponse = {
   error: string;
   errorCode:
     | "provider_error"
     | "method_not_allowed"
     | "invalid_address"
-    | "artist_not_found";
+    | "artist_not_found"
+    | "invalid_day"
+    | "canvas_not_found";
 };

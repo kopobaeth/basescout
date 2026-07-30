@@ -17,14 +17,22 @@ import {
   Zap
 } from "lucide-react";
 import { BasePaintArtistPage } from "./BasePaintArtistPage";
+import { BasePaintCanvasPage } from "./BasePaintCanvasPage";
 import { loadBasePaintOverview, loadBasePaintPulse } from "./client";
 import {
   basePaintArtistRouteAddress,
   basePaintArtistUrl,
   basePaintArtworkUrl,
-  basePaintCanvasUrl
+  basePaintCanvasRouteDay,
+  basePaintCanvasScoutUrl,
+  basePaintCanvasPhase
 } from "./data";
-import { ethFromWei, numberText, shortIdentity } from "./format";
+import {
+  ethFromWei,
+  numberText,
+  shortIdentity,
+  usdFromUsd8
+} from "./format";
 import type {
   BasePaintCanvas,
   BasePaintOverviewResponse,
@@ -35,16 +43,6 @@ import "./basepaint.css";
 type BasePaintLoadStatus = "loading" | "success" | "error";
 
 const CURRENT_CANVAS_IMAGE = "https://basepaint.xyz/api/art/image?day=painting&scale=1";
-
-function usdFromUsd8(value: string) {
-  const amount = Number(value) / 100_000_000;
-  if (!Number.isFinite(amount) || amount <= 0) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: amount < 100 ? 2 : 0
-  }).format(amount);
-}
 
 function timestampText(value?: number | null) {
   if (!value) return "No recent strokes";
@@ -66,9 +64,8 @@ function pulseLabel(pulse: BasePaintPulseResponse | null) {
 }
 
 function phaseLabel(day: number, currentDay: number) {
-  if (day === currentDay) return "Painting";
-  if (day === currentDay - 1) return "Collecting";
-  return "Complete";
+  const phase = basePaintCanvasPhase(day, currentDay);
+  return `${phase.charAt(0).toUpperCase()}${phase.slice(1)}`;
 }
 
 function timeRemaining(endsAt: number, now: number) {
@@ -112,9 +109,7 @@ function CanvasCard({ canvas, currentDay }: { canvas: BasePaintCanvas; currentDa
     <article className="bp-canvas-card">
       <a
         className="bp-canvas-art"
-        href={basePaintCanvasUrl(canvas.day)}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={basePaintCanvasScoutUrl(canvas.day)}
         aria-label={`Open BasePaint day ${canvas.day}: ${title}`}
       >
         <img
@@ -630,7 +625,7 @@ function BasePaintOverviewPage() {
                 </dd>
               </div>
             </dl>
-            <a href={basePaintCanvasUrl(collectCanvas.day)} target="_blank" rel="noopener noreferrer">
+            <a href={basePaintCanvasScoutUrl(collectCanvas.day)}>
               View canvas
               <ArrowUpRight size={17} />
             </a>
@@ -683,6 +678,11 @@ function BasePaintOverviewPage() {
 }
 
 export function BasePaintPage() {
+  const canvasDay = basePaintCanvasRouteDay(window.location.pathname);
+  if (canvasDay !== undefined) {
+    return <BasePaintCanvasPage day={canvasDay} />;
+  }
+
   const artistAddress = basePaintArtistRouteAddress(window.location.pathname);
   return artistAddress !== undefined ? (
     <BasePaintArtistPage address={artistAddress} />
