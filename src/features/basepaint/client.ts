@@ -11,7 +11,7 @@ import type {
 
 const BASEPAINT_REQUEST_TIMEOUT_MS = 10_000;
 
-function apiErrorMessage(value: unknown, fallback: string) {
+export function apiErrorMessage(value: unknown, fallback: string) {
   if (!value || typeof value !== "object") return fallback;
   const payload = value as Record<string, unknown>;
   if (typeof payload.error === "string" && payload.error.trim()) return payload.error;
