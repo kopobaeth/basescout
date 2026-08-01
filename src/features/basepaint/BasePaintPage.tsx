@@ -502,6 +502,37 @@ function BasePaintOverviewPage() {
           </div>
         </div>
 
+        <section className="bp-collector-entry" aria-labelledby="collector-entry-title">
+          <div>
+            <span className="bp-collector-entry-icon" aria-hidden="true">
+              <Layers3 size={22} />
+            </span>
+            <div>
+              <span>Hackathon build · For Collectors</span>
+              <h2 id="collector-entry-title">Scout a BasePaint collection</h2>
+              <p>Enter any public Base address. No wallet connection or API key required.</p>
+            </div>
+          </div>
+          <form onSubmit={inspectCollector}>
+            <label className="bp-visually-hidden" htmlFor="bp-overview-collector-address">
+              Public Base address
+            </label>
+            <input
+              id="bp-overview-collector-address"
+              value={collectorAddress}
+              onChange={(event) => setCollectorAddress(event.target.value)}
+              autoComplete="off"
+              inputMode="text"
+              placeholder="0x…"
+              spellCheck="false"
+            />
+            <button type="submit">
+              <Search size={15} />
+              Scout collection
+            </button>
+          </form>
+        </section>
+
         <section className="bp-hero" id="today">
           <div className="bp-current-art">
             <div className="bp-frame-label">
@@ -642,37 +673,6 @@ function BasePaintOverviewPage() {
             </a>
           </section>
         ) : null}
-
-        <section className="bp-collector-entry" aria-labelledby="collector-entry-title">
-          <div>
-            <span className="bp-collector-entry-icon" aria-hidden="true">
-              <Layers3 size={22} />
-            </span>
-            <div>
-              <span>Hackathon build · For Collectors</span>
-              <h2 id="collector-entry-title">Scout a BasePaint collection</h2>
-              <p>Enter any public Base address. No wallet connection or API key required.</p>
-            </div>
-          </div>
-          <form onSubmit={inspectCollector}>
-            <label className="bp-visually-hidden" htmlFor="bp-overview-collector-address">
-              Public Base address
-            </label>
-            <input
-              id="bp-overview-collector-address"
-              value={collectorAddress}
-              onChange={(event) => setCollectorAddress(event.target.value)}
-              autoComplete="off"
-              inputMode="text"
-              placeholder="0x…"
-              spellCheck="false"
-            />
-            <button type="submit">
-              <Search size={15} />
-              Open Collector Scout
-            </button>
-          </form>
-        </section>
 
         <CanvasPulse
           error={pulseError}

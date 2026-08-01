@@ -2151,9 +2151,9 @@
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(430px, 1.1fr);
   align-items: center;
-  margin: 0 0 52px;
-  gap: 22px;
-  padding: clamp(18px, 3vw, 28px);
+  margin: 0 0 14px;
+  gap: 18px;
+  padding: clamp(14px, 2vw, 20px);
   background:
     linear-gradient(135deg, rgba(0, 82, 255, 0.28), transparent 62%),
     var(--bp-panel);
@@ -2175,8 +2175,8 @@
 
 .bp-collector-entry-icon {
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   flex: 0 0 auto;
   color: #111827;
   background: var(--bp-yellow);
@@ -2195,7 +2195,7 @@
   margin: 5px 0 0;
   color: var(--bp-white);
   font-family: "Arial Black", "Roboto Mono", sans-serif;
-  font-size: clamp(1.35rem, 2.6vw, 2.15rem);
+  font-size: clamp(1.25rem, 2.3vw, 1.9rem);
   letter-spacing: -0.04em;
   line-height: 1;
 }
