@@ -1,4 +1,4 @@
-import { normalizeBasePaintCanvas } from "./data";
+import { normalizeBasePaintCanvas } from "./data.js";
 import type {
   BasePaintCollectorHolding,
   BasePaintCollectorPaletteColor,
