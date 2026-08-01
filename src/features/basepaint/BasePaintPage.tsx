@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import {
   Activity,
   ArrowLeft,
@@ -8,17 +8,21 @@ import {
   ExternalLink,
   Grid3X3,
   Image as ImageIcon,
+  Layers3,
   Loader2,
   Palette,
   Radio,
   RefreshCw,
+  Search,
   Sparkles,
   Users,
   Zap
 } from "lucide-react";
 import { BasePaintArtistPage } from "./BasePaintArtistPage";
 import { BasePaintCanvasPage } from "./BasePaintCanvasPage";
+import { BasePaintCollectorPage } from "./BasePaintCollectorPage";
 import { loadBasePaintOverview, loadBasePaintPulse } from "./client";
+import { basePaintCollectorRouteAddress, basePaintCollectorUrl } from "./collector";
 import {
   basePaintArtistRouteAddress,
   basePaintArtistUrl,
@@ -333,6 +337,7 @@ function CanvasPulse({
 }
 
 function BasePaintOverviewPage() {
+  const [collectorAddress, setCollectorAddress] = useState("");
   const [data, setData] = useState<BasePaintOverviewResponse | null>(null);
   const [error, setError] = useState("");
   const [pulse, setPulse] = useState<BasePaintPulseResponse | null>(null);
@@ -437,6 +442,12 @@ function BasePaintOverviewPage() {
   const canvasSize = data?.theme?.size ?? currentCanvas?.size;
   const isLoading = status === "loading";
 
+  function inspectCollector(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const address = collectorAddress.trim();
+    if (address) window.location.assign(basePaintCollectorUrl(address));
+  }
+
   return (
     <main className="bp-app">
       <header className="bp-header">
@@ -490,6 +501,37 @@ function BasePaintOverviewPage() {
             )}
           </div>
         </div>
+
+        <section className="bp-collector-entry" aria-labelledby="collector-entry-title">
+          <div>
+            <span className="bp-collector-entry-icon" aria-hidden="true">
+              <Layers3 size={22} />
+            </span>
+            <div>
+              <span>Hackathon build · For Collectors</span>
+              <h2 id="collector-entry-title">Scout a BasePaint collection</h2>
+              <p>Enter any public Base address. No wallet connection or API key required.</p>
+            </div>
+          </div>
+          <form onSubmit={inspectCollector}>
+            <label className="bp-visually-hidden" htmlFor="bp-overview-collector-address">
+              Public Base address
+            </label>
+            <input
+              id="bp-overview-collector-address"
+              value={collectorAddress}
+              onChange={(event) => setCollectorAddress(event.target.value)}
+              autoComplete="off"
+              inputMode="text"
+              placeholder="0x…"
+              spellCheck="false"
+            />
+            <button type="submit">
+              <Search size={15} />
+              Scout collection
+            </button>
+          </form>
+        </section>
 
         <section className="bp-hero" id="today">
           <div className="bp-current-art">
@@ -681,6 +723,11 @@ export function BasePaintPage() {
   const canvasDay = basePaintCanvasRouteDay(window.location.pathname);
   if (canvasDay !== undefined) {
     return <BasePaintCanvasPage day={canvasDay} />;
+  }
+
+  const collectorAddress = basePaintCollectorRouteAddress(window.location.pathname);
+  if (collectorAddress !== undefined) {
+    return <BasePaintCollectorPage address={collectorAddress} />;
   }
 
   const artistAddress = basePaintArtistRouteAddress(window.location.pathname);

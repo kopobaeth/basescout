@@ -115,6 +115,41 @@ export type BasePaintArtistResponse = {
   brushes: BasePaintArtistBrush[];
 };
 
+export type BasePaintCollectorHolding = {
+  day: number;
+  editions: number;
+  name?: string;
+  palette: string[];
+  totalArtists: number;
+  pixelsCount: number;
+  totalMints: number;
+  totalBurns: number;
+};
+
+export type BasePaintCollectorPaletteColor = {
+  color: string;
+  canvasCount: number;
+};
+
+export type BasePaintCollectorResponse = {
+  source: "basepaint";
+  attribution: "Public onchain data by BasePaint";
+  artworkLicense: "CC0";
+  generatedAt: number;
+  currentDay: number;
+  cacheSeconds: number;
+  address: string;
+  totalCanvasDays: number;
+  totalEditions: number;
+  earliestHeldDay: number | null;
+  latestHeldDay: number | null;
+  sampledCanvasDays: number;
+  sampleLimit: number;
+  truncated: boolean;
+  dominantPalette: BasePaintCollectorPaletteColor[];
+  collection: BasePaintCollectorHolding[];
+};
+
 export type BasePaintCanvasPhase = "painting" | "collecting" | "complete";
 
 export type BasePaintCanvasContributor = {
