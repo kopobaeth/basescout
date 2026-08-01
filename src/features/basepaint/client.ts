@@ -1,10 +1,12 @@
 import { isBasePaintOverviewResponse } from "./data";
 import { isBasePaintArtistResponse } from "./artist";
 import { isBasePaintCanvasResponse } from "./canvas";
+import { isBasePaintCollectorResponse } from "./collector";
 import { isBasePaintPulseResponse } from "./pulse";
 import type {
   BasePaintArtistResponse,
   BasePaintCanvasResponse,
+  BasePaintCollectorResponse,
   BasePaintOverviewResponse,
   BasePaintPulseResponse
 } from "./types";
@@ -147,6 +149,40 @@ export async function loadBasePaintCanvas(
     }
     if (!isBasePaintCanvasResponse(payload)) {
       throw new Error("BasePaint canvas data returned an unexpected response.");
+    }
+
+    return payload;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abortFromParent);
+  }
+}
+
+export async function loadBasePaintCollector(
+  address: string,
+  signal?: AbortSignal
+): Promise<BasePaintCollectorResponse> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), BASEPAINT_REQUEST_TIMEOUT_MS);
+  const abortFromParent = () => controller.abort();
+  signal?.addEventListener("abort", abortFromParent, { once: true });
+
+  try {
+    const response = await fetch(`/api/basepaint-collector?address=${encodeURIComponent(address)}`, {
+      headers: {
+        Accept: "application/json"
+      },
+      signal: controller.signal
+    });
+    const payload = (await response.json()) as unknown;
+
+    if (!response.ok) {
+      throw new Error(
+        apiErrorMessage(payload, `BasePaint collector request returned HTTP ${response.status}.`)
+      );
+    }
+    if (!isBasePaintCollectorResponse(payload)) {
+      throw new Error("BasePaint collector data returned an unexpected response.");
     }
 
     return payload;

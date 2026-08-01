@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import basePaintActivityHandler from "./api/basepaint-activity";
 import basePaintArtistHandler from "./api/basepaint-artist";
 import basePaintCanvasHandler from "./api/basepaint-canvas";
+import basePaintCollectorHandler from "./api/basepaint-collector";
 import basePaintHandler from "./api/basepaint";
 import scanHandler from "./api/scan";
 
@@ -41,6 +42,11 @@ export default defineConfig({
 
           if (pathname === "/api/basepaint-canvas") {
             void basePaintCanvasHandler(request, response);
+            return;
+          }
+
+          if (pathname === "/api/basepaint-collector") {
+            void basePaintCollectorHandler(request, response);
             return;
           }
 

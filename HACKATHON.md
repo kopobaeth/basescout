@@ -7,9 +7,12 @@
 - **One-line pitch:** Turn public BasePaint history into a transparent collector profile, useful canvas recommendations, and an explicit onchain collection flow.
 - **Live product:** https://www.basescout.app/basepaint
 - **Public repository:** https://github.com/kopobaeth/basescout
-- **Official event:** https://basepaint.xyz/hack/details
+- **Official event:** https://basepaint.xyz/hack
+- **Kickoff post to quote:** https://x.com/basepaint_xyz/status/2080669785927590234
+- **Final submission form:** https://tally.so/r/pbXEdJ
 - **Build window:** August 1–8, 2026
 - **Submission deadline:** August 8, 2026 at 23:59 UTC
+- **Rewards:** 2 ETH worth of BasePaint editions across the grand prize, category winners, and honorable mentions, plus swag.
 
 ## Eligibility boundary
 
@@ -204,20 +207,20 @@ Contract addresses and ABIs must be reverified from canonical sources after kick
 - [x] Define the Collector Scout scope and non-goals.
 - [x] Define safety, data, and transaction boundaries.
 - [ ] Register for the hackathon.
-- [ ] Confirm the final kickoff post and entry instructions on August 1.
-- [ ] Create a clean feature branch from the then-current `main` after kickoff.
+- [x] Confirm the final kickoff post and entry instructions on August 1.
+- [x] Create a clean feature branch from the then-current `main` after kickoff (`agent/basepaint-collector-scout-20260801`).
 
 ### August 1–2 — read model
 
-- [ ] Verify current BasePaint GraphQL ownership and canvas queries.
-- [ ] Add normalized collector response types and fixtures.
-- [ ] Add a bounded read-only collector API.
-- [ ] Add unit and API contract tests.
-- [ ] Build the shareable Collector Scout route and loading/error states.
+- [x] Verify current BasePaint GraphQL ownership and canvas queries.
+- [x] Add normalized collector response types and fixtures.
+- [x] Add a bounded read-only collector API.
+- [x] Add unit and API contract tests.
+- [x] Build the shareable Collector Scout route and loading/error states.
 
 ### August 3–4 — collector intelligence
 
-- [ ] Add collection summary and artwork grid.
+- [x] Add collection summary and artwork grid.
 - [ ] Add artist, palette, and period signals.
 - [ ] Implement deterministic recommendation evidence.
 - [ ] Add confidence and provider coverage.
@@ -253,6 +256,8 @@ Contract addresses and ABIs must be reverified from canonical sources after kick
 - [ ] Publish the required quote-tweet before 23:59 UTC.
 - [ ] Include the live app, public repository, short demo, and what was built during the event.
 - [ ] Archive the final submission text, media, commit SHA, and transaction evidence.
+
+The public entry is the single quote-post of the official kickoff post. The Tally form records the final project link, email, prize wallet, and optionally the project post; the official hack page still requires the quote-post even though that Tally field is not marked required.
 
 ## Acceptance criteria
 
