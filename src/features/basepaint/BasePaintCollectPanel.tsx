@@ -12,7 +12,7 @@ import {
   WalletCards,
   XCircle
 } from "lucide-react";
-import type { Address, Hash } from "viem";
+import type { Address, Hash, Hex } from "viem";
 import {
   BASEPAINT_REWARDS_ADDRESS,
   BASEPAINT_REWARDS_RECIPIENT,
@@ -44,6 +44,7 @@ type CollectStatus =
 export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: string }) {
   const [account, setAccount] = useState<Address | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [callsId, setCallsId] = useState<Hex | null>(null);
   const [error, setError] = useState("");
   const [quote, setQuote] = useState<BasePaintCollectQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
@@ -91,6 +92,7 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
   async function connect() {
     setStatus("connecting");
     setError("");
+    setCallsId(null);
     setTransactionHash(null);
     try {
       const connectedAccount = await connectBaseAccount();
@@ -110,6 +112,7 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
     } finally {
       setAccount(null);
       setAcknowledged(false);
+      setCallsId(null);
       setError("");
       setStatus("disconnected");
       setTransactionHash(null);
@@ -118,6 +121,7 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
 
   async function openReview() {
     setAcknowledged(false);
+    setCallsId(null);
     setError("");
     setTransactionHash(null);
     const nextQuote = await refreshQuote();
@@ -148,15 +152,24 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
         return;
       }
 
-      const hash = await submitBasePaintCollect(account, freshQuote);
-      setTransactionHash(hash);
+      const nextCallsId = await submitBasePaintCollect(account, freshQuote);
+      setCallsId(nextCallsId);
       setStatus("pending");
 
       try {
-        const receiptStatus = await waitForBasePaintCollect(hash);
-        setStatus(receiptStatus === "success" ? "success" : "reverted");
-        if (receiptStatus !== "success") {
+        const confirmation = await waitForBasePaintCollect(nextCallsId);
+        setTransactionHash(confirmation.transactionHash);
+        setStatus(
+          confirmation.outcome === "success"
+            ? "success"
+            : confirmation.outcome === "reverted"
+              ? "reverted"
+              : "error"
+        );
+        if (confirmation.outcome === "reverted") {
           setError("The transaction was included but reverted. No edition was collected.");
+        } else if (confirmation.outcome === "failed") {
+          setError("Base Account stopped the call before onchain inclusion. Nothing was sent.");
         }
       } catch (confirmationError) {
         setError(classifyBasePaintCollectError(confirmationError).message);
@@ -170,14 +183,23 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
   }
 
   async function checkConfirmation() {
-    if (!transactionHash) return;
+    if (!callsId) return;
     setError("");
     setStatus("pending");
     try {
-      const receiptStatus = await waitForBasePaintCollect(transactionHash);
-      setStatus(receiptStatus === "success" ? "success" : "reverted");
-      if (receiptStatus !== "success") {
+      const confirmation = await waitForBasePaintCollect(callsId);
+      setTransactionHash(confirmation.transactionHash);
+      setStatus(
+        confirmation.outcome === "success"
+          ? "success"
+          : confirmation.outcome === "reverted"
+            ? "reverted"
+            : "error"
+      );
+      if (confirmation.outcome === "reverted") {
         setError("The transaction was included but reverted. No edition was collected.");
+      } else if (confirmation.outcome === "failed") {
+        setError("Base Account stopped the call before onchain inclusion. Nothing was sent.");
       }
     } catch (confirmationError) {
       setError(classifyBasePaintCollectError(confirmationError).message);
