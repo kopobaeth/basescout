@@ -81,7 +81,7 @@ For the latest eligible BasePaint canvas:
 
 - use Base Account for wallet connection and transaction review;
 - route the write through the canonical BasePaint contract surface;
-- prefer `BasePaintRewards.mintLatest()` when its current ABI and transaction requirements are verified;
+- use the verified payable `BasePaintRewards.mintLatest(address,uint256,address)` ABI;
 - show contract, function, chain, quantity, estimated value, and wallet before submission;
 - never connect, sign, or submit automatically;
 - keep rejection, insufficient funds, wrong chain, reverted transaction, and pending states distinct;
@@ -228,9 +228,9 @@ Contract addresses and ABIs must be reverified from canonical sources after kick
 
 ### August 5 — Base Account and collecting
 
-- [ ] Add optional Base Account connection.
-- [ ] Verify `BasePaintRewards.mintLatest()` against the current ABI.
-- [ ] Add explicit transaction review and error states.
+- [x] Add optional Base Account connection.
+- [x] Verify payable `BasePaintRewards.mintLatest(address,uint256,address)` against the current ABI.
+- [x] Add explicit transaction review and rejected, pending, reverted, and success states.
 - [ ] Complete one controlled Base mainnet test transaction.
 - [ ] Record the transaction hash as submission evidence.
 

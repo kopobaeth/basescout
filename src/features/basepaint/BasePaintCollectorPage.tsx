@@ -28,6 +28,7 @@ import {
   utcDateTimeText
 } from "./format";
 import type { BasePaintCollectorResponse } from "./types";
+import { BasePaintCollectPanel } from "./BasePaintCollectPanel";
 
 type CollectorLoadStatus = "loading" | "success" | "error";
 
@@ -516,6 +517,8 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
                 </a>
               </section>
             )}
+
+            <BasePaintCollectPanel inspectedAddress={collector.address} />
 
             <aside className="bp-collector-coverage">
               <strong>{confidenceLabel(collector.coverage.confidence)} coverage</strong>
