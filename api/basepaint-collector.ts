@@ -17,6 +17,7 @@ const BASEPAINT_COLLECTOR_CACHE_MS = 60_000;
 const BASEPAINT_COLLECTOR_STALE_MS = 5 * 60_000;
 const BASEPAINT_COLLECTOR_CACHE_LIMIT = 100;
 export const BASEPAINT_COLLECTOR_SAMPLE_LIMIT = 48;
+export const BASEPAINT_COLLECTOR_RECOMMENDATION_CANDIDATE_LIMIT = 24;
 const SUCCESS_CACHE_CONTROL = "public, max-age=0, s-maxage=60, stale-while-revalidate=300";
 const ERROR_CACHE_CONTROL = "private, no-store";
 
@@ -50,12 +51,30 @@ const COLLECTOR_QUERY = `
 `;
 
 const COLLECTOR_CANVASES_QUERY = `
-  query BaseScoutBasePaintCollectorCanvases($days: [Int!]!, $limit: Int!) {
+  query BaseScoutBasePaintCollectorCanvases($days: [Int!]!, $limit: Int!, $recentLimit: Int!) {
     canvass(
       where: { id_in: $days }
       orderBy: "id"
       orderDirection: "desc"
       limit: $limit
+    ) {
+      items {
+        id
+        name
+        palette
+        proposer
+        totalArtists
+        pixelsCount
+        totalMints
+        totalBurns
+        totalEarned
+        totalEarnedUsd8
+      }
+    }
+    recent: canvass(
+      orderBy: "id"
+      orderDirection: "desc"
+      limit: $recentLimit
     ) {
       items {
         id
@@ -154,10 +173,14 @@ async function fetchCollectorPayloads(address: string, currentDay: number) {
     const canvases = days.length
       ? await fetchGraphqlPayload(
           COLLECTOR_CANVASES_QUERY,
-          { days, limit: BASEPAINT_COLLECTOR_SAMPLE_LIMIT },
+          {
+            days,
+            limit: BASEPAINT_COLLECTOR_SAMPLE_LIMIT,
+            recentLimit: BASEPAINT_COLLECTOR_RECOMMENDATION_CANDIDATE_LIMIT
+          },
           controller.signal
         )
-      : { data: { canvass: { items: [] } } };
+      : { data: { canvass: { items: [] }, recent: { items: [] } } };
     return { summary, canvases };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

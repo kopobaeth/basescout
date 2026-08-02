@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
+  BarChart3,
   CalendarDays,
   Check,
   Copy,
@@ -12,7 +13,9 @@ import {
   Palette,
   RefreshCw,
   Search,
+  ShieldCheck,
   Sparkles,
+  Target,
   Users
 } from "lucide-react";
 import { loadBasePaintCollector } from "./client";
@@ -30,6 +33,16 @@ type CollectorLoadStatus = "loading" | "success" | "error";
 
 function heldDayLabel(day: number | null) {
   return day ? `Day #${numberText(day)}` : "—";
+}
+
+function confidenceLabel(confidence: BasePaintCollectorResponse["coverage"]["confidence"]) {
+  return `${confidence.charAt(0).toUpperCase()}${confidence.slice(1)}`;
+}
+
+function recommendationPhaseLabel(phase: BasePaintCollectorResponse["recommendations"][number]["phase"]) {
+  if (phase === "painting") return "Painting today";
+  if (phase === "collecting") return "Collecting now";
+  return "Complete";
 }
 
 export function BasePaintCollectorPage({ address }: { address: string }) {
@@ -246,6 +259,104 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
 
             {collector.collection.length ? (
               <>
+                <section className="bp-collector-intelligence" aria-labelledby="collector-intelligence-title">
+                  <div className="bp-section-heading">
+                    <div>
+                      <span>Sampled current holdings</span>
+                      <h2 id="collector-intelligence-title">Collection intelligence</h2>
+                    </div>
+                    <p>
+                      Periods and proposer signals describe the sampled canvases currently held;
+                      they do not reconstruct acquisition history.
+                    </p>
+                  </div>
+
+                  <div className="bp-collector-signal-cards">
+                    <article>
+                      <BarChart3 size={18} />
+                      <span>Longest held-day run</span>
+                      <strong>{numberText(collector.signals.longestHeldDayRun)} days</strong>
+                      <small>Consecutive token IDs in the sample</small>
+                    </article>
+                    <article>
+                      <Layers3 size={18} />
+                      <span>Multiple-edition days</span>
+                      <strong>{numberText(collector.signals.multipleEditionDays)}</strong>
+                      <small>Sampled days with more than one edition</small>
+                    </article>
+                    <article>
+                      <CalendarDays size={18} />
+                      <span>Leading period</span>
+                      <strong>{collector.signals.periods[0]?.label ?? "Unavailable"}</strong>
+                      <small>
+                        {collector.signals.periods[0]
+                          ? `${collector.signals.periods[0].percentage}% of the sample`
+                          : "No period metadata"}
+                      </small>
+                    </article>
+                    <article>
+                      <ShieldCheck size={18} />
+                      <span>Intelligence coverage</span>
+                      <strong>{confidenceLabel(collector.coverage.confidence)}</strong>
+                      <small>{collector.coverage.samplePercentage}% of held days sampled</small>
+                    </article>
+                  </div>
+
+                  <div className="bp-collector-signal-panels">
+                    <article>
+                      <div>
+                        <span>Period profile</span>
+                        <small>Share of sampled held days</small>
+                      </div>
+                      <ol>
+                        {collector.signals.periods.map((period) => (
+                          <li key={period.label}>
+                            <div>
+                              <strong>{period.label}</strong>
+                              <span>
+                                Days {numberText(period.startDay)}–{numberText(period.endDay)}
+                              </span>
+                            </div>
+                            <i aria-hidden="true">
+                              <b style={{ width: `${period.percentage}%` }} />
+                            </i>
+                            <em>
+                              {numberText(period.canvasCount)} · {period.percentage}%
+                            </em>
+                          </li>
+                        ))}
+                      </ol>
+                    </article>
+
+                    <article>
+                      <div>
+                        <span>Recurring theme proposers</span>
+                        <small>Share with proposer metadata · not artist attribution</small>
+                      </div>
+                      {collector.signals.themeProposers.length ? (
+                        <ol>
+                          {collector.signals.themeProposers.map((entry) => (
+                            <li key={entry.proposer}>
+                              <div>
+                                <strong>{shortIdentity(entry.proposer)}</strong>
+                                <span>Public proposer identity</span>
+                              </div>
+                              <i aria-hidden="true">
+                                <b style={{ width: `${entry.percentage}%` }} />
+                              </i>
+                              <em>
+                                {numberText(entry.canvasCount)} · {entry.percentage}%
+                              </em>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p>No theme-proposer metadata was returned for this sample.</p>
+                      )}
+                    </article>
+                  </div>
+                </section>
+
                 <section className="bp-collector-palette" aria-labelledby="collector-palette-title">
                   <div className="bp-section-heading">
                     <div>
@@ -256,6 +367,7 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
                       {collector.truncated
                         ? `Based on the latest ${numberText(collector.sampledCanvasDays)} of ${numberText(collector.totalCanvasDays)} held days.`
                         : `Based on all ${numberText(collector.sampledCanvasDays)} currently held days.`}
+                      {" "}Percentages use canvases with palette metadata.
                     </p>
                   </div>
 
@@ -265,12 +377,78 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
                         <li key={entry.color}>
                           <i style={{ backgroundColor: entry.color }} aria-hidden="true" />
                           <strong>{entry.color}</strong>
-                          <span>{numberText(entry.canvasCount)} canvases</span>
+                          <span>
+                            {numberText(entry.canvasCount)} canvases · {entry.percentage}%
+                          </span>
                         </li>
                       ))}
                     </ol>
                   ) : (
                     <div className="bp-artist-empty">No palette metadata was returned for this sample.</div>
+                  )}
+                </section>
+
+                <section className="bp-collector-recommendations" aria-labelledby="collector-recommendations-title">
+                  <div className="bp-section-heading">
+                    <div>
+                      <span>Deterministic discovery</span>
+                      <h2 id="collector-recommendations-title">Recommended canvases</h2>
+                    </div>
+                    <p>
+                      Up to three recent canvases ranked by the evidence shown below. Discovery
+                      matches only — not financial advice.
+                    </p>
+                  </div>
+
+                  {collector.recommendations.length ? (
+                    <div className="bp-collector-recommendation-grid">
+                      {collector.recommendations.map((recommendation) => (
+                        <article className="bp-collector-recommendation" key={recommendation.day}>
+                          <a href={basePaintCanvasScoutUrl(recommendation.day)}>
+                            <img
+                              src={basePaintArtworkUrl(recommendation.day)}
+                              alt={recommendation.name ?? `BasePaint day ${recommendation.day}`}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </a>
+                          <div className="bp-collector-recommendation-copy">
+                            <div className="bp-collector-recommendation-meta">
+                              <span>Day #{numberText(recommendation.day)}</span>
+                              <b className={recommendation.phase}>
+                                {recommendationPhaseLabel(recommendation.phase)}
+                              </b>
+                            </div>
+                            <h3>{recommendation.name ?? `Canvas #${numberText(recommendation.day)}`}</h3>
+                            <div className="bp-collector-match-score">
+                              <Target size={15} />
+                              <strong>{recommendation.matchScore}/100 evidence match</strong>
+                            </div>
+                            <h4>Why this canvas</h4>
+                            <ul>
+                              {recommendation.evidence.map((entry) => (
+                                <li key={entry.code}>
+                                  <Check size={13} />
+                                  <span>
+                                    <strong>{entry.label}</strong>
+                                    {entry.detail}
+                                  </span>
+                                  <em>+{entry.weight}</em>
+                                </li>
+                              ))}
+                            </ul>
+                            <a className="bp-collector-recommendation-link" href={basePaintCanvasScoutUrl(recommendation.day)}>
+                              Open Canvas Scout
+                              <ArrowUpRight size={14} />
+                            </a>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bp-artist-empty">
+                      No recent canvas has enough visible overlap with this sample to recommend.
+                    </div>
                   )}
                 </section>
 
@@ -340,7 +518,13 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
             )}
 
             <aside className="bp-collector-coverage">
-              <strong>Coverage</strong>
+              <strong>{confidenceLabel(collector.coverage.confidence)} coverage</strong>
+              <span>
+                Sampled {numberText(collector.coverage.sampledCanvasDays)} of {numberText(collector.coverage.totalCanvasDays)} held days ({collector.coverage.samplePercentage}%)
+              </span>
+              <span>
+                Palette metadata {numberText(collector.coverage.paletteMetadataDays)}/{numberText(collector.coverage.sampledCanvasDays)} · theme proposer {numberText(collector.coverage.proposerMetadataDays)}/{numberText(collector.coverage.sampledCanvasDays)}
+              </span>
               <span>Current BasePaint ERC-1155 balances · no acquisition-history claim</span>
               <span>Updated {utcDateTimeText(collector.generatedAt)} UTC</span>
             </aside>
