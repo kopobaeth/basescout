@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --import tsx src/riskSecurity.test.ts && node --import tsx src/riskEngine.test.ts && node --import tsx src/reportContract.test.ts && node --import tsx src/reliability.test.ts && node --import tsx src/trending.test.ts && node --import tsx src/features/basepaint/data.test.ts && node --import tsx src/features/basepaint/pulse.test.ts && node --import tsx src/features/basepaint/artist.test.ts && node --import tsx src/features/basepaint/canvas.test.ts && node --import tsx src/features/basepaint/collector.test.ts && node --import tsx src/features/basepaint/client.test.ts && node --import tsx api/basepaint.test.ts && node --import tsx api/basepaint-activity.test.ts && node --import tsx api/basepaint-artist.test.ts && node --import tsx api/basepaint-canvas.test.ts && node --import tsx api/basepaint-collector.test.ts && node --import tsx src/baseMcpPlugin.test.ts",
+    "test": "node --import tsx src/riskSecurity.test.ts && node --import tsx src/riskEngine.test.ts && node --import tsx src/reportContract.test.ts && node --import tsx src/reliability.test.ts && node --import tsx src/trending.test.ts && node --import tsx src/features/basepaint/data.test.ts && node --import tsx src/features/basepaint/pulse.test.ts && node --import tsx src/features/basepaint/artist.test.ts && node --import tsx src/features/basepaint/canvas.test.ts && node --import tsx src/features/basepaint/collector.test.ts && node --import tsx src/features/basepaint/collect.test.ts && node --import tsx src/features/basepaint/client.test.ts && node --import tsx api/basepaint.test.ts && node --import tsx api/basepaint-activity.test.ts && node --import tsx api/basepaint-artist.test.ts && node --import tsx api/basepaint-canvas.test.ts && node --import tsx api/basepaint-collector.test.ts && node --import tsx src/baseMcpPlugin.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@base-org/account": "^2.5.8",
     "@vercel/analytics": "^2.0.1",
     "lucide-react": "^0.468.0",
     "posthog-js": "^1.399.2",
@@ -25,5 +26,8 @@
     "tsx": "^4.23.0",
     "typescript": "^5.6.3",
     "vite": "^6.0.1"
+  },
+  "overrides": {
+    "axios": "1.19.0"
   }
 }

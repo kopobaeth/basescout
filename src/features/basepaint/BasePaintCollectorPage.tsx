@@ -28,6 +28,7 @@ import {
   utcDateTimeText
 } from "./format";
 import type { BasePaintCollectorResponse } from "./types";
+import { BasePaintCollectPanel } from "./BasePaintCollectPanel";
 
 type CollectorLoadStatus = "loading" | "success" | "error";
 
@@ -190,6 +191,8 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
           </section>
         ) : collector ? (
           <>
+            <BasePaintCollectPanel inspectedAddress={collector.address} />
+
             <section className="bp-collector-hero">
               <div className="bp-collector-identity">
                 <div className="bp-kicker">
