@@ -1,15 +1,15 @@
 import type { ProviderInterface } from "@base-org/account";
 import {
   createPublicClient,
-  createWalletClient,
-  custom,
+  encodeFunctionData,
   formatEther,
   getAddress,
   http,
   isAddress,
+  isHex,
+  numberToHex,
   zeroAddress,
   type Address,
-  type EIP1193Provider,
   type Hash
 } from "viem";
 import { base } from "viem/chains";
@@ -96,6 +96,11 @@ export type BasePaintCollectError = {
   message: string;
 };
 
+export type BasePaintCollectConfirmation = {
+  outcome: "failed" | "reverted" | "success";
+  transactionHash: Hash | null;
+};
+
 const publicClient = createPublicClient({
   chain: base,
   transport: http(BASEPAINT_RPC_URL, { retryCount: 1, timeout: 12_000 })
@@ -112,23 +117,101 @@ function chainIdFromRpc(value: unknown) {
   return Number.parseInt(value, value.startsWith("0x") ? 16 : 10);
 }
 
-function errorCode(value: unknown): number | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
+function errorCode(value: unknown, depth = 0): number | undefined {
+  if (depth > 5 || typeof value !== "object" || value === null) return undefined;
   const record = value as Record<string, unknown>;
   if (typeof record.code === "number") return record.code;
-  return errorCode(record.cause);
+  return (
+    errorCode(record.cause, depth + 1) ??
+    errorCode(record.error, depth + 1) ??
+    errorCode(record.data, depth + 1)
+  );
 }
 
-function errorText(value: unknown, depth = 0): string {
-  if (depth > 4 || typeof value !== "object" || value === null) {
-    return value instanceof Error ? value.message : "";
+function errorText(value: unknown, depth = 0, seen = new Set<unknown>()): string {
+  if (depth > 5 || typeof value !== "object" || value === null || seen.has(value)) {
+    return typeof value === "string" ? value : "";
+  }
+
+  seen.add(value);
+  const record = value as Record<string, unknown>;
+  return [
+    record.shortMessage,
+    record.details,
+    record.message,
+    record.type,
+    errorText(record.cause, depth + 1, seen),
+    errorText(record.error, depth + 1, seen),
+    errorText(record.data, depth + 1, seen)
+  ]
+    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    .join(" ");
+}
+
+function throwResolvedProviderError(value: Record<string, unknown>): never {
+  const error = new Error(
+    typeof value.message === "string" ? value.message : "Base Account returned an error response."
+  ) as Error & { code?: number; data?: unknown };
+  if (typeof value.code === "number") error.code = value.code;
+  if (value.data !== undefined) error.data = value.data;
+  throw error;
+}
+
+export function basePaintCollectCallsId(value: unknown): `0x${string}` {
+  if (typeof value === "string" && isHex(value) && value.length >= 66) return value;
+
+  if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    if (typeof record.code === "number" || record.error) throwResolvedProviderError(record);
+
+    const candidate = [record.id, record.batchId].find(
+      (entry): entry is `0x${string}` =>
+        typeof entry === "string" && isHex(entry) && entry.length >= 66
+    );
+    if (candidate) return candidate;
+  }
+
+  throw new Error("Base Account returned an invalid call bundle identifier.");
+}
+
+function callsStatusTransactionHash(value: Record<string, unknown>) {
+  if (!Array.isArray(value.receipts)) return null;
+  for (const receipt of value.receipts) {
+    if (typeof receipt !== "object" || receipt === null) continue;
+    const candidate = (receipt as Record<string, unknown>).transactionHash;
+    if (typeof candidate === "string" && /^0x[0-9a-fA-F]{64}$/.test(candidate)) {
+      return candidate as Hash;
+    }
+  }
+  return null;
+}
+
+export function parseBasePaintCollectCallsStatus(
+  value: unknown
+): BasePaintCollectConfirmation | null {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Base Account returned an invalid call status.");
   }
 
   const record = value as Record<string, unknown>;
-  const direct = [record.shortMessage, record.details, record.message].find(
-    (entry): entry is string => typeof entry === "string" && entry.trim().length > 0
-  );
-  return direct ?? errorText(record.cause, depth + 1);
+  if (typeof record.code === "number" || record.error) throwResolvedProviderError(record);
+  if (typeof record.status !== "number") {
+    throw new Error("Base Account returned an invalid call status.");
+  }
+
+  const transactionHash = callsStatusTransactionHash(record);
+  if (record.status >= 100 && record.status < 200) return null;
+  if (record.status >= 200 && record.status < 300) {
+    return { outcome: "success", transactionHash };
+  }
+  if (record.status >= 400 && record.status < 500) {
+    return { outcome: "failed", transactionHash };
+  }
+  if (record.status >= 500 && record.status < 700) {
+    return { outcome: "reverted", transactionHash };
+  }
+
+  throw new Error(`Base Account returned unsupported call status ${record.status}.`);
 }
 
 async function baseAccountProvider() {
@@ -263,33 +346,68 @@ export async function submitBasePaintCollect(account: Address, quote: BasePaintC
 
   const provider = await baseAccountProvider();
   await ensureBaseChain(provider);
-  const walletClient = createWalletClient({
-    account,
-    chain: base,
-    transport: custom(provider as unknown as EIP1193Provider)
-  });
   const call = buildBasePaintCollectCall(account, quote);
-  const { request } = await publicClient.simulateContract(call);
-  return walletClient.writeContract(request);
+  const data = encodeFunctionData({
+    abi: call.abi,
+    functionName: call.functionName,
+    args: call.args
+  });
+  const response = await provider.request({
+    method: "wallet_sendCalls",
+    params: [
+      {
+        version: "2.0.0",
+        from: account,
+        chainId: numberToHex(base.id),
+        atomicRequired: true,
+        calls: [
+          {
+            to: call.address,
+            data,
+            value: numberToHex(call.value)
+          }
+        ]
+      }
+    ]
+  });
+  return basePaintCollectCallsId(response);
 }
 
-export async function waitForBasePaintCollect(hash: Hash) {
-  const receipt = await publicClient.waitForTransactionReceipt({
-    confirmations: 1,
-    hash,
-    timeout: 120_000
-  });
-  return receipt.status;
+export async function waitForBasePaintCollect(callsId: `0x${string}`) {
+  const provider = await baseAccountProvider();
+  const deadline = Date.now() + 120_000;
+
+  while (Date.now() < deadline) {
+    const response = await provider.request({
+      method: "wallet_getCallsStatus",
+      params: [callsId]
+    });
+    const confirmation = parseBasePaintCollectCallsStatus(response);
+    if (confirmation) return confirmation;
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+
+  throw new Error("Base Account call confirmation timed out.");
 }
 
 export function classifyBasePaintCollectError(value: unknown): BasePaintCollectError {
   const code = errorCode(value);
   const text = errorText(value).toLowerCase();
 
-  if (code === 4001 || text.includes("user rejected") || text.includes("user denied")) {
+  if (
+    code === 4001 ||
+    text.includes("user rejected") ||
+    text.includes("user denied") ||
+    text.includes("user cancelled funding")
+  ) {
     return { kind: "rejected", message: "Transaction rejected. Nothing was sent." };
   }
-  if (text.includes("insufficient funds")) {
+  if (
+    code === -32090 ||
+    text.includes("insufficient funds") ||
+    text.includes("insufficient balance") ||
+    text.includes("insufficient_funds")
+  ) {
     return {
       kind: "insufficient_funds",
       message: "Insufficient ETH for the edition value and Base network fee."
