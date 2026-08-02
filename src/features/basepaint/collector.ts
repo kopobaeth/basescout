@@ -239,7 +239,7 @@ function recommendationEvidence(
       code: "collecting_now",
       label: "Collecting now",
       detail: "This is the latest completed canvas and is currently in BasePaint’s collecting phase.",
-      weight: 20
+      weight: 15
     });
   }
 
@@ -266,7 +266,7 @@ function collectorRecommendations(
         proposer: candidate.proposer,
         palette: candidate.palette,
         phase: basePaintCanvasPhase(candidate.day, currentDay),
-        matchScore: Math.min(100, evidence.reduce((total, entry) => total + entry.weight, 0)),
+        matchScore: evidence.reduce((total, entry) => total + entry.weight, 0),
         evidence
       };
     })
@@ -415,7 +415,6 @@ export function isBasePaintCollectorResponse(value: unknown): value is BasePaint
   ) {
     return false;
   }
-
 
   if (
     !Number.isInteger(value.coverage.sampledCanvasDays) ||

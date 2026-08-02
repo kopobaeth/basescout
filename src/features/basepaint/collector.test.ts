@@ -150,7 +150,7 @@ assert.deepEqual(collector.signals.themeProposers[0], {
 assert.equal(collector.recommendations.length, 3);
 assert.equal(collector.recommendations[0].day, 610);
 assert.equal(collector.recommendations[0].phase, "collecting");
-assert.equal(collector.recommendations[0].matchScore, 95);
+assert.equal(collector.recommendations[0].matchScore, 90);
 assert.deepEqual(
   collector.recommendations[0].evidence.map((entry) => entry.code),
   ["palette_match", "theme_proposer_match", "near_held_day", "collecting_now"]

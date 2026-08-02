@@ -2425,7 +2425,7 @@
 
 .bp-collector-signal-cards span {
   color: var(--bp-muted);
-  font-size: 0.55rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
 }
 
@@ -2439,7 +2439,7 @@
 
 .bp-collector-signal-cards small {
   color: #8192b6;
-  font-size: 0.54rem;
+  font-size: 0.58rem;
   line-height: 1.4;
 }
 
@@ -2476,7 +2476,7 @@
 .bp-collector-signal-panels > article > div small,
 .bp-collector-signal-panels > article > p {
   color: var(--bp-muted);
-  font-size: 0.54rem;
+  font-size: 0.57rem;
 }
 
 .bp-collector-signal-panels > article > p {
@@ -2515,14 +2515,14 @@
 .bp-collector-signal-panels li strong {
   overflow: hidden;
   color: var(--bp-white);
-  font-size: 0.62rem;
+  font-size: 0.65rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bp-collector-signal-panels li span {
   color: var(--bp-muted);
-  font-size: 0.51rem;
+  font-size: 0.56rem;
 }
 
 .bp-collector-signal-panels li > i {
@@ -2542,7 +2542,7 @@
 
 .bp-collector-signal-panels li em {
   color: var(--bp-yellow);
-  font-size: 0.56rem;
+  font-size: 0.59rem;
   font-style: normal;
   font-weight: 700;
   white-space: nowrap;
@@ -2638,7 +2638,7 @@
 
 .bp-collector-recommendation-meta > span {
   color: var(--bp-yellow);
-  font-size: 0.57rem;
+  font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -2649,7 +2649,7 @@
   background: #26334b;
   border: 1px solid #3d527d;
   border-radius: 3px;
-  font-size: 0.5rem;
+  font-size: 0.54rem;
   text-transform: uppercase;
 }
 
@@ -2684,14 +2684,14 @@
 }
 
 .bp-collector-match-score strong {
-  font-size: 0.57rem;
+  font-size: 0.61rem;
   text-transform: uppercase;
 }
 
 .bp-collector-recommendation h4 {
   margin: 17px 0 8px;
   color: var(--bp-muted);
-  font-size: 0.54rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
 }
 
@@ -2709,7 +2709,7 @@
   align-items: start;
   gap: 7px;
   color: var(--bp-muted);
-  font-size: 0.53rem;
+  font-size: 0.58rem;
   line-height: 1.5;
 }
 
@@ -2725,7 +2725,7 @@
 
 .bp-collector-recommendation li strong {
   color: var(--bp-white);
-  font-size: 0.56rem;
+  font-size: 0.61rem;
 }
 
 .bp-collector-recommendation li em {
@@ -2743,7 +2743,7 @@
   padding-top: 15px;
   color: var(--bp-white);
   border-top: 1px solid var(--bp-line);
-  font-size: 0.58rem;
+  font-size: 0.61rem;
   font-weight: 700;
   text-decoration: none;
   text-transform: uppercase;
