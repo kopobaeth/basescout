@@ -191,6 +191,8 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
           </section>
         ) : collector ? (
           <>
+            <BasePaintCollectPanel inspectedAddress={collector.address} />
+
             <section className="bp-collector-hero">
               <div className="bp-collector-identity">
                 <div className="bp-kicker">
@@ -517,8 +519,6 @@ export function BasePaintCollectorPage({ address }: { address: string }) {
                 </a>
               </section>
             )}
-
-            <BasePaintCollectPanel inspectedAddress={collector.address} />
 
             <aside className="bp-collector-coverage">
               <strong>{confidenceLabel(collector.coverage.confidence)} coverage</strong>
