@@ -119,6 +119,7 @@ export type BasePaintCollectorHolding = {
   day: number;
   editions: number;
   name?: string;
+  proposer?: string;
   palette: string[];
   totalArtists: number;
   pixelsCount: number;
@@ -129,6 +130,62 @@ export type BasePaintCollectorHolding = {
 export type BasePaintCollectorPaletteColor = {
   color: string;
   canvasCount: number;
+  percentage: number;
+};
+
+export type BasePaintCollectorPeriod = {
+  label: string;
+  startDay: number;
+  endDay: number;
+  canvasCount: number;
+  percentage: number;
+};
+
+export type BasePaintCollectorThemeProposer = {
+  proposer: string;
+  canvasCount: number;
+  percentage: number;
+};
+
+export type BasePaintCollectorCoverageConfidence = "high" | "medium" | "low";
+
+export type BasePaintCollectorCoverage = {
+  sampledCanvasDays: number;
+  totalCanvasDays: number;
+  samplePercentage: number;
+  paletteMetadataDays: number;
+  proposerMetadataDays: number;
+  confidence: BasePaintCollectorCoverageConfidence;
+};
+
+export type BasePaintCollectorSignals = {
+  longestHeldDayRun: number;
+  multipleEditionDays: number;
+  periods: BasePaintCollectorPeriod[];
+  themeProposers: BasePaintCollectorThemeProposer[];
+};
+
+export type BasePaintCollectorRecommendationEvidenceCode =
+  | "palette_match"
+  | "theme_proposer_match"
+  | "near_held_day"
+  | "collecting_now";
+
+export type BasePaintCollectorRecommendationEvidence = {
+  code: BasePaintCollectorRecommendationEvidenceCode;
+  label: string;
+  detail: string;
+  weight: number;
+};
+
+export type BasePaintCollectorRecommendation = {
+  day: number;
+  name?: string;
+  proposer?: string;
+  palette: string[];
+  phase: BasePaintCanvasPhase;
+  matchScore: number;
+  evidence: BasePaintCollectorRecommendationEvidence[];
 };
 
 export type BasePaintCollectorResponse = {
@@ -146,7 +203,10 @@ export type BasePaintCollectorResponse = {
   sampledCanvasDays: number;
   sampleLimit: number;
   truncated: boolean;
+  coverage: BasePaintCollectorCoverage;
+  signals: BasePaintCollectorSignals;
   dominantPalette: BasePaintCollectorPaletteColor[];
+  recommendations: BasePaintCollectorRecommendation[];
   collection: BasePaintCollectorHolding[];
 };
 

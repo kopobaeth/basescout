@@ -221,9 +221,9 @@ Contract addresses and ABIs must be reverified from canonical sources after kick
 ### August 3–4 — collector intelligence
 
 - [x] Add collection summary and artwork grid.
-- [ ] Add artist, palette, and period signals.
-- [ ] Implement deterministic recommendation evidence.
-- [ ] Add confidence and provider coverage.
+- [x] Add theme-proposer, palette, and period signals.
+- [x] Implement deterministic recommendation evidence.
+- [x] Add confidence and provider coverage.
 - [ ] Verify desktop and mobile layouts.
 
 ### August 5 — Base Account and collecting
