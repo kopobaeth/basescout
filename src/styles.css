@@ -140,6 +140,21 @@ span.disabled {
   border-color: var(--base-blue);
 }
 
+.header-action-button.basepaint-nav-link {
+  color: #17233b;
+  background: #fff5bd;
+  border-color: #e9bf24;
+  box-shadow: 0 3px 12px rgba(221, 170, 0, 0.14);
+}
+
+.header-action-button.basepaint-nav-link:hover,
+.header-action-button.basepaint-nav-link:focus-visible {
+  color: #17233b;
+  background: #ffe45e;
+  border-color: #c99a00;
+  box-shadow: 0 4px 16px rgba(221, 170, 0, 0.22);
+}
+
 .header-x-link svg {
   flex: 0 0 auto;
 }
