@@ -977,7 +977,7 @@ function ScoutApp() {
               Trending
             </a>
           )}
-          <a className="header-action-button nav-link" href="/basepaint">
+          <a className="header-action-button nav-link basepaint-nav-link" href="/basepaint">
             BasePaint
           </a>
           <a className="header-action-button header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
