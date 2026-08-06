@@ -961,12 +961,12 @@ function ScoutApp() {
   return (
     <main className="shell">
       <nav className="topbar" aria-label="Primary navigation">
-        <div className="brand">
+        <a className="brand" href="/" onClick={handleScanNav}>
           <span className="brand-mark" aria-hidden="true">
             <img src="/basescout-logo.png?v=2" alt="" width="32" height="32" />
           </span>
           <span>BaseScout</span>
-        </div>
+        </a>
         <div className="topbar-actions">
           {isTrendingPage ? (
             <a className="header-action-button nav-link" href="/" onClick={handleScanNav}>
@@ -990,7 +990,15 @@ function ScoutApp() {
           </div>
         </div>
       </nav>
-      <p className="data-note">Data from DEX Screener and BaseScan.</p>
+      <div className="data-note" aria-label="BaseScout data status">
+        <span>Public Base data</span>
+        <span aria-hidden="true">/</span>
+        <span>DEX Screener + BaseScan</span>
+        <span className="data-note-live">
+          <span className="status-dot" aria-hidden="true" />
+          Live workspace
+        </span>
+      </div>
 
       {isTrendingPage ? (
         <TrendingPage
@@ -1003,8 +1011,18 @@ function ScoutApp() {
         <>
       <section className="hero">
         <div className="hero-copy">
+          <div className="hero-index">
+            <span>Research console 001</span>
+            <span>
+              <span className="status-dot" aria-hidden="true" />
+              Live now
+            </span>
+          </div>
           <p className="eyebrow">Base token risk scanner</p>
           <h1>Scan the token. Read the risk. Then decide.</h1>
+          <p className="hero-summary">
+            Market, contract, and security signals in one Base research workspace.
+          </p>
         </div>
 
         <form className="scanner" onSubmit={handleScan}>
@@ -1077,7 +1095,21 @@ function ScoutApp() {
         watchlist={watchlist}
       />
 
-      <section className="dashboard" aria-live="polite">
+      <section className="workspace-dock" aria-label="Research workspace sections">
+        <div>
+          <span>Research workspace</span>
+          <strong>{selectedToken?.symbol ? `${selectedToken.symbol} overview` : "Token overview"}</strong>
+        </div>
+        <nav aria-label="Report sections">
+          <a className="active" href="#overview">
+            Overview
+          </a>
+          <a href="#markets">Markets</a>
+          <a href="#security">Security</a>
+        </nav>
+      </section>
+
+      <section className="dashboard" id="overview" aria-live="polite">
         <article className={`risk-card ${result ? scoreTone(result.riskLevel) : ""} ${isLoading ? "loading" : ""}`}>
           <div className="card-heading">
             <div>
@@ -1331,7 +1363,7 @@ function ScoutApp() {
           </dl>
         </article>
 
-        <article className="panel security-panel">
+        <article className="panel security-panel" id="security">
           <div className="panel-head">
             <div>
               <p className="section-kicker">Security Intelligence</p>
@@ -1406,7 +1438,7 @@ function MarketsSection({
   const visiblePairs = pairs.slice(0, 5);
 
   return (
-    <section className="panel markets-panel" aria-label="Markets">
+    <section className="panel markets-panel" id="markets" aria-label="Markets">
       <div className="panel-head">
         <div>
           <p className="section-kicker">Markets</p>
