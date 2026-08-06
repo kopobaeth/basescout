@@ -1,6 +1,10 @@
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
+import "@fontsource/ibm-plex-mono/latin-600.css";
+import "@fontsource/ibm-plex-mono/latin-700.css";
 import {
   Activity,
   AlertTriangle,
@@ -965,7 +969,10 @@ function ScoutApp() {
           <span className="brand-mark" aria-hidden="true">
             <img src="/basescout-logo.png?v=2" alt="" width="32" height="32" />
           </span>
-          <span>BaseScout</span>
+          <span className="brand-copy">
+            <strong>BaseScout</strong>
+            <small>Onchain intelligence</small>
+          </span>
         </div>
         <div className="topbar-actions">
           {isTrendingPage ? (
@@ -990,7 +997,10 @@ function ScoutApp() {
           </div>
         </div>
       </nav>
-      <p className="data-note">Data from DEX Screener and BaseScan.</p>
+      <p className="data-note">
+        <span><i aria-hidden="true" /> Live Base data</span>
+        <span>DEX Screener + BaseScan</span>
+      </p>
 
       {isTrendingPage ? (
         <TrendingPage
@@ -1003,8 +1013,16 @@ function ScoutApp() {
         <>
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">Base token risk scanner</p>
-          <h1>Scan the token. Read the risk. Then decide.</h1>
+          <p className="eyebrow"><span aria-hidden="true">[</span> Base token intelligence <span aria-hidden="true">]</span></p>
+          <h1>Scan the token. <span>Read the risk.</span> Then decide.</h1>
+          <p className="hero-lede">
+            Liquidity, contract signals, and transparent scoring in one research surface.
+          </p>
+          <div className="hero-tags" aria-label="BaseScout research layers">
+            <span>Liquidity</span>
+            <span>Contract</span>
+            <span>Security</span>
+          </div>
         </div>
 
         <form className="scanner" onSubmit={handleScan}>
