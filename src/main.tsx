@@ -1,14 +1,15 @@
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
-import "@fontsource/ibm-plex-mono/latin-400.css";
-import "@fontsource/ibm-plex-mono/latin-500.css";
-import "@fontsource/ibm-plex-mono/latin-600.css";
-import "@fontsource/ibm-plex-mono/latin-700.css";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
 import {
   Activity,
   AlertTriangle,
   ArrowUpRight,
+  Bookmark,
   Check,
   CheckCircle2,
   Clock3,
@@ -18,7 +19,11 @@ import {
   Fingerprint,
   History,
   Info,
+  LayoutDashboard,
   Loader2,
+  Menu,
+  Palette,
+  PanelLeftClose,
   RefreshCw,
   Search,
   ScanLine,
@@ -554,6 +559,8 @@ function App() {
 
 function ScoutApp() {
   const [routePath, setRoutePath] = useState(() => window.location.pathname);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState<ScanStatus>("idle");
   const [errorState, setErrorState] = useState<ScanErrorView | null>(null);
@@ -719,6 +726,23 @@ function ScoutApp() {
     return () => controller.abort();
   }, [isTrendingPage, trendingReloadKey]);
 
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleSidebarKeydown(event: KeyboardEvent) {
+      if (event.key === "Escape") setSidebarOpen(false);
+    }
+
+    window.addEventListener("keydown", handleSidebarKeydown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleSidebarKeydown);
+    };
+  }, [sidebarOpen]);
+
   function resetForInput(nextAddress: string) {
     setAddress(nextAddress);
     setErrorState(null);
@@ -855,6 +879,7 @@ function ScoutApp() {
 
   function handleTrendingNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
+    setSidebarOpen(false);
     cancelActiveScanForNavigation();
     if (!isTrendingPage) {
       window.history.pushState({}, "", trendingPageUrl());
@@ -865,12 +890,43 @@ function ScoutApp() {
 
   function handleScanNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
+    setSidebarOpen(false);
     cancelActiveScanForNavigation();
     if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
       window.history.pushState({}, "", homePageUrl());
     }
     setRoutePath("/");
     restoreHomeMetadata();
+  }
+
+  function handleSectionNav(event: React.MouseEvent<HTMLAnchorElement>, sectionId: string) {
+    event.preventDefault();
+    setSidebarOpen(false);
+
+    if (isTrendingPage) {
+      window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
+      setRoutePath("/");
+      restoreHomeMetadata();
+    } else if (window.location.hash !== `#${sectionId}`) {
+      window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
+    }
+
+    window.setTimeout(() => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start"
+      });
+    }, 40);
+  }
+
+  function toggleSidebar() {
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      setSidebarOpen((open) => !open);
+      return;
+    }
+
+    setSidebarCollapsed((collapsed) => !collapsed);
   }
 
   function cancelActiveScanForNavigation() {
@@ -963,9 +1019,16 @@ function ScoutApp() {
   }
 
   return (
-    <main className="shell">
-      <nav className="topbar" aria-label="Primary navigation">
-        <div className="brand">
+    <main className={`app-frame ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <button
+        aria-label="Close navigation"
+        className={`sidebar-backdrop ${sidebarOpen ? "visible" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+        type="button"
+      />
+
+      <aside className={`app-sidebar ${sidebarOpen ? "open" : ""}`} id="primary-sidebar">
+        <a className="sidebar-brand" href="/" onClick={handleScanNav} title="BaseScout home">
           <span className="brand-mark" aria-hidden="true">
             <img src="/basescout-logo.png?v=2" alt="" width="32" height="32" />
           </span>
@@ -973,34 +1036,104 @@ function ScoutApp() {
             <strong>BaseScout</strong>
             <small>Onchain intelligence</small>
           </span>
-        </div>
-        <div className="topbar-actions">
-          {isTrendingPage ? (
-            <a className="header-action-button nav-link" href="/" onClick={handleScanNav}>
-              Scan
+        </a>
+
+        <nav className="sidebar-nav" aria-label="BaseScout workspace">
+          <div className="sidebar-group">
+            <p>Research</p>
+            <a
+              aria-current={!isTrendingPage ? "page" : undefined}
+              className={!isTrendingPage ? "sidebar-link active" : "sidebar-link"}
+              href="/"
+              onClick={handleScanNav}
+              title="Token scanner"
+            >
+              <ScanLine size={17} />
+              <span>Token scanner</span>
             </a>
-          ) : (
-            <a className="header-action-button nav-link" href="/trending" onClick={handleTrendingNav}>
-              Trending
+            <a
+              aria-current={isTrendingPage ? "page" : undefined}
+              className={isTrendingPage ? "sidebar-link active" : "sidebar-link"}
+              href="/trending"
+              onClick={handleTrendingNav}
+              title="Trending pools"
+            >
+              <Activity size={17} />
+              <span>Trending pools</span>
             </a>
-          )}
-          <a className="header-action-button nav-link basepaint-nav-link" href="/basepaint">
-            BasePaint
-          </a>
-          <a className="header-action-button header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
+          </div>
+
+          <div className="sidebar-group">
+            <p>Workspace</p>
+            <a className="sidebar-link" href="/#overview" onClick={(event) => handleSectionNav(event, "overview")} title="Overview">
+              <LayoutDashboard size={17} />
+              <span>Overview</span>
+            </a>
+            <a className="sidebar-link" href="/#watchlist" onClick={(event) => handleSectionNav(event, "watchlist")} title="Watchlist">
+              <Bookmark size={17} />
+              <span>Watchlist</span>
+              <b>{watchlist.length}</b>
+            </a>
+            <a className="sidebar-link" href="/#recent-scans" onClick={(event) => handleSectionNav(event, "recent-scans")} title="Recent scans">
+              <History size={17} />
+              <span>Recent scans</span>
+              <b>{scanHistory.length}</b>
+            </a>
+            <a className="sidebar-link" href="/#security" onClick={(event) => handleSectionNav(event, "security")} title="Security intelligence">
+              <ShieldCheck size={17} />
+              <span>Security</span>
+            </a>
+          </div>
+
+          <div className="sidebar-group">
+            <p>Explore</p>
+            <a className="sidebar-link basepaint-sidebar-link" href="/basepaint" title="BasePaint explorer">
+              <Palette size={17} />
+              <span>BasePaint</span>
+              <ArrowUpRight size={14} />
+            </a>
+          </div>
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-status">
+            <span className="status-dot" />
+            <span>
+              <strong>Base mainnet</strong>
+              <small>Live data connected</small>
+            </span>
+          </div>
+          <a href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="BaseScout updates on X" title="Updates on X">
             <X size={16} />
             <span>Updates on X</span>
           </a>
-          <div className="network-pill">
-            <span className="status-dot" />
-            Base mainnet
-          </div>
         </div>
-      </nav>
-      <p className="data-note">
-        <span><i aria-hidden="true" /> Live Base data</span>
-        <span>DEX Screener + BaseScan</span>
-      </p>
+      </aside>
+
+      <section className="workspace-shell">
+        <header className="workspace-header">
+          <button
+            aria-controls="primary-sidebar"
+            aria-expanded={sidebarOpen}
+            aria-label={sidebarCollapsed ? "Expand navigation" : "Toggle navigation"}
+            className="sidebar-toggle"
+            onClick={toggleSidebar}
+            type="button"
+          >
+            <Menu className="mobile-menu-icon" size={18} />
+            <PanelLeftClose className="desktop-menu-icon" size={18} />
+          </button>
+          <div className="workspace-title">
+            <span>BaseScout / {isTrendingPage ? "Markets" : "Research"}</span>
+            <h1>{isTrendingPage ? "Trending Base Pools" : "Token Intelligence"}</h1>
+          </div>
+          <div className="workspace-header-meta">
+            <span className="source-status"><i aria-hidden="true" /> DEX Screener + BaseScan</span>
+            <span className="network-pill"><span className="status-dot" /> Base mainnet</span>
+          </div>
+        </header>
+
+        <div className="workspace-content">
 
       {isTrendingPage ? (
         <TrendingPage
@@ -1011,7 +1144,7 @@ function ScoutApp() {
         />
       ) : (
         <>
-      <section className="hero">
+      <section className="hero" id="scanner">
         <div className="hero-copy">
           <p className="eyebrow"><span aria-hidden="true">[</span> Base token intelligence <span aria-hidden="true">]</span></p>
           <h1>Scan the token. <span>Read the risk.</span> Then decide.</h1>
@@ -1081,21 +1214,7 @@ function ScoutApp() {
         </form>
       </section>
 
-      <RecentScans
-        disabled={isLoading}
-        history={scanHistory}
-        onClear={clearHistory}
-        onRescan={rescanHistoryItem}
-      />
-
-      <WatchlistSection
-        disabled={isLoading}
-        onRemove={removeWatchlistListItem}
-        onRescan={rescanWatchlistItem}
-        watchlist={watchlist}
-      />
-
-      <section className="dashboard" aria-live="polite">
+      <section className="dashboard" id="overview" aria-live="polite">
         <article className={`risk-card ${result ? scoreTone(result.riskLevel) : ""} ${isLoading ? "loading" : ""}`}>
           <div className="card-heading">
             <div>
@@ -1172,13 +1291,30 @@ function ScoutApp() {
         </section>
       </section>
 
-      <MarketsSection
-        loading={isLoading}
-        pairs={selectedPairs}
-        primaryPair={selectedPair}
-        tokenAddress={selectedToken?.address ?? normalizedAddress}
-        tokenSymbol={selectedToken?.symbol}
-      />
+      <div id="markets">
+        <MarketsSection
+          loading={isLoading}
+          pairs={selectedPairs}
+          primaryPair={selectedPair}
+          tokenAddress={selectedToken?.address ?? normalizedAddress}
+          tokenSymbol={selectedToken?.symbol}
+        />
+      </div>
+
+      <section className="workspace-secondary" aria-label="Saved research">
+        <WatchlistSection
+          disabled={isLoading}
+          onRemove={removeWatchlistListItem}
+          onRescan={rescanWatchlistItem}
+          watchlist={watchlist}
+        />
+        <RecentScans
+          disabled={isLoading}
+          history={scanHistory}
+          onClear={clearHistory}
+          onRescan={rescanHistoryItem}
+        />
+      </section>
 
       <section className="detail-grid">
         <article className="panel risk-breakdown-panel">
@@ -1349,7 +1485,7 @@ function ScoutApp() {
           </dl>
         </article>
 
-        <article className="panel security-panel">
+        <article className="panel security-panel" id="security">
           <div className="panel-head">
             <div>
               <p className="section-kicker">Security Intelligence</p>
@@ -1368,6 +1504,8 @@ function ScoutApp() {
         <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
         <span>Not financial advice.</span>
       </footer>
+        </div>
+      </section>
     </main>
   );
 }
@@ -1629,7 +1767,7 @@ function WatchlistSection({
   watchlist: WatchlistItem[];
 }) {
   return (
-    <section className="watchlist-section" aria-label="Watchlist">
+    <section className="watchlist-section" id="watchlist" aria-label="Watchlist">
       <div className="recent-head">
         <div>
           <p className="section-kicker">Watchlist</p>
@@ -1774,7 +1912,7 @@ function RecentScans({
   onRescan: (item: ScanHistoryItem) => void;
 }) {
   return (
-    <section className="recent-scans" aria-label="Recent scans">
+    <section className="recent-scans" id="recent-scans" aria-label="Recent scans">
       <div className="recent-head">
         <div>
           <p className="section-kicker">Recent scans</p>
