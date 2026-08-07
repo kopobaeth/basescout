@@ -1137,13 +1137,6 @@ function ScoutApp() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-status">
-            <span className="status-dot" />
-            <span>
-              <strong>Base mainnet</strong>
-              <small>Live data connected</small>
-            </span>
-          </div>
           <a href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="BaseScout updates on X" title="Updates on X">
             <X size={16} />
             <span>Updates on X</span>
@@ -1232,11 +1225,6 @@ function ScoutApp() {
           <p className="hero-lede">
             Liquidity, contract signals, and transparent scoring in one research surface.
           </p>
-          <div className="hero-tags" aria-label="BaseScout research layers">
-            <span>Liquidity</span>
-            <span>Contract</span>
-            <span>Security</span>
-          </div>
         </div>
 
         <form className="scanner" onSubmit={handleScan}>
