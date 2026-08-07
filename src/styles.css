@@ -2135,26 +2135,6 @@ h2 {
   line-height: 1.65;
 }
 
-.hero-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.hero-tags span {
-  min-height: 28px;
-  padding: 6px 9px;
-  color: #a8a8a8;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid #333333;
-  border-radius: 5px;
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .scanner {
   gap: 14px;
   padding: 20px;
@@ -2824,7 +2804,6 @@ body {
   border-top: 1px solid var(--vantage-border);
 }
 
-.sidebar-status,
 .sidebar-footer > a {
   display: flex;
   align-items: center;
@@ -2837,22 +2816,6 @@ body {
   border-radius: 8px;
   font-size: 0.74rem;
   text-decoration: none;
-}
-
-.sidebar-status > span:last-child {
-  display: grid;
-  min-width: 0;
-}
-
-.sidebar-status strong {
-  color: var(--vantage-text-primary);
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.sidebar-status small {
-  color: var(--vantage-text-tertiary);
-  font-size: 0.64rem;
 }
 
 .sidebar-footer > a:hover {
@@ -2868,7 +2831,6 @@ body {
 .sidebar-collapsed .sidebar-group > p,
 .sidebar-collapsed .sidebar-link span,
 .sidebar-collapsed .sidebar-link b,
-.sidebar-collapsed .sidebar-status > span:last-child,
 .sidebar-collapsed .sidebar-footer > a span,
 .sidebar-collapsed .basepaint-sidebar-link svg:last-child {
   display: none;
@@ -2885,8 +2847,7 @@ body {
   padding: 0;
 }
 
-.sidebar-collapsed .sidebar-footer > a,
-.sidebar-collapsed .sidebar-status {
+.sidebar-collapsed .sidebar-footer > a {
   justify-content: center;
   padding-inline: 0;
 }
@@ -3144,19 +3105,6 @@ body {
   color: var(--vantage-accent);
   font-size: 0.64rem;
   letter-spacing: 0.08em;
-}
-
-.hero-tags {
-  margin-top: 18px;
-}
-
-.hero-tags span {
-  color: var(--vantage-text-secondary);
-  background: var(--vantage-surface-muted);
-  border-color: var(--vantage-border);
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 0.62rem;
 }
 
 .scanner {
@@ -3434,8 +3382,7 @@ body {
     opacity: 1;
   }
 
-  .sidebar-collapsed .brand-copy,
-  .sidebar-collapsed .sidebar-status > span:last-child {
+  .sidebar-collapsed .brand-copy {
     display: grid;
   }
 
@@ -3464,8 +3411,7 @@ body {
     padding: 0 9px;
   }
 
-  .sidebar-collapsed .sidebar-footer > a,
-  .sidebar-collapsed .sidebar-status {
+  .sidebar-collapsed .sidebar-footer > a {
     justify-content: flex-start;
     padding-inline: 8px;
   }
