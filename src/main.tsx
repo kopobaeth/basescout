@@ -1,27 +1,35 @@
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
 import {
   Activity,
   AlertTriangle,
   ArrowUpRight,
+  Bookmark,
   Check,
   CheckCircle2,
-  Clock3,
   Copy,
   ExternalLink,
   FileCheck2,
   Fingerprint,
   History,
   Info,
+  LayoutDashboard,
   Loader2,
+  Menu,
+  MoreHorizontal,
+  Palette,
+  PanelLeftClose,
   RefreshCw,
   Search,
   ScanLine,
   ShieldAlert,
   ShieldCheck,
   ShieldQuestion,
-  ShieldX,
   Trash2,
   WalletCards,
   X
@@ -83,6 +91,7 @@ const BasePaintPage = React.lazy(() =>
 type ScanStatus = "idle" | "loading" | "success" | "error";
 type CopyState = "idle" | "copied" | "failed";
 type ScanSource = "manual" | "example" | "history" | "route" | "watchlist";
+type WorkspacePanel = "saved" | "risk" | "security";
 
 type ScanContext = {
   source: ScanSource;
@@ -176,6 +185,13 @@ function homePageUrl() {
 
 function isTrendingPath(pathname = window.location.pathname) {
   return pathname === trendingPath();
+}
+
+function workspacePanelFromHash(hash = window.location.hash): WorkspacePanel | null {
+  if (hash === "#saved-research") return "saved";
+  if (hash === "#risk-breakdown") return "risk";
+  if (hash === "#security") return "security";
+  return null;
 }
 
 function tokenRouteAddress(pathname = window.location.pathname) {
@@ -550,12 +566,16 @@ function App() {
 
 function ScoutApp() {
   const [routePath, setRoutePath] = useState(() => window.location.pathname);
+  const [activeWorkspacePanel, setActiveWorkspacePanel] = useState<WorkspacePanel | null>(() => workspacePanelFromHash());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState<ScanStatus>("idle");
   const [errorState, setErrorState] = useState<ScanErrorView | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [baseScan, setBaseScan] = useState<BaseScanIntelligence>(() => emptyBaseScanIntelligence());
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [tokenAddressCopyState, setTokenAddressCopyState] = useState<CopyState>("idle");
   const [linkCopyState, setLinkCopyState] = useState<CopyState>("idle");
   const [trendingStatus, setTrendingStatus] = useState<TrendingStatus>("idle");
   const [trendingError, setTrendingError] = useState("");
@@ -661,6 +681,7 @@ function ScoutApp() {
   useEffect(() => {
     function handleTokenRoute() {
       setRoutePath(window.location.pathname);
+      setActiveWorkspacePanel(workspacePanelFromHash());
 
       if (isTrendingPath()) {
         cancelActiveScanForNavigation();
@@ -677,6 +698,7 @@ function ScoutApp() {
 
       setAddress(routeAddress);
       setCopyState("idle");
+      setTokenAddressCopyState("idle");
       setLinkCopyState("idle");
 
       if (!isTokenContractAddress(routeAddress)) {
@@ -715,10 +737,28 @@ function ScoutApp() {
     return () => controller.abort();
   }, [isTrendingPage, trendingReloadKey]);
 
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleSidebarKeydown(event: KeyboardEvent) {
+      if (event.key === "Escape") setSidebarOpen(false);
+    }
+
+    window.addEventListener("keydown", handleSidebarKeydown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleSidebarKeydown);
+    };
+  }, [sidebarOpen]);
+
   function resetForInput(nextAddress: string) {
     setAddress(nextAddress);
     setErrorState(null);
     setCopyState("idle");
+    setTokenAddressCopyState("idle");
     setLinkCopyState("idle");
 
     if (status !== "idle" || result) {
@@ -743,6 +783,7 @@ function ScoutApp() {
     setAddress(tokenAddress);
     setErrorState(null);
     setCopyState("idle");
+    setTokenAddressCopyState("idle");
     setLinkCopyState("idle");
     trackEvent("scan_clicked", scanEventProperties);
 
@@ -851,6 +892,8 @@ function ScoutApp() {
 
   function handleTrendingNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
+    setSidebarOpen(false);
+    setActiveWorkspacePanel(null);
     cancelActiveScanForNavigation();
     if (!isTrendingPage) {
       window.history.pushState({}, "", trendingPageUrl());
@@ -861,12 +904,59 @@ function ScoutApp() {
 
   function handleScanNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
+    setSidebarOpen(false);
+    setActiveWorkspacePanel(null);
     cancelActiveScanForNavigation();
     if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
       window.history.pushState({}, "", homePageUrl());
     }
     setRoutePath("/");
     restoreHomeMetadata();
+  }
+
+  function handleSectionNav(event: React.MouseEvent<HTMLAnchorElement>, sectionId: string) {
+    event.preventDefault();
+    setSidebarOpen(false);
+    setActiveWorkspacePanel(null);
+
+    if (isTrendingPage) {
+      window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
+      setRoutePath("/");
+      restoreHomeMetadata();
+    } else if (window.location.hash !== `#${sectionId}`) {
+      window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
+    }
+
+    window.setTimeout(() => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start"
+      });
+    }, 40);
+  }
+
+  function handleWorkspacePanelNav(event: React.MouseEvent<HTMLAnchorElement>, panel: WorkspacePanel) {
+    event.preventDefault();
+    setSidebarOpen(false);
+    setActiveWorkspacePanel(panel);
+    setRoutePath("/");
+
+    const sectionId = panel === "saved" ? "saved-research" : panel === "risk" ? "risk-breakdown" : "security";
+    window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
+    restoreHomeMetadata();
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+  }
+
+  function toggleSidebar() {
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      setSidebarOpen((open) => !open);
+      return;
+    }
+
+    setSidebarCollapsed((collapsed) => !collapsed);
   }
 
   function cancelActiveScanForNavigation() {
@@ -945,6 +1035,21 @@ function ScoutApp() {
     }
   }
 
+  async function copyTokenAddress() {
+    if (!selectedTokenAddress) return;
+
+    try {
+      await writeClipboardText(selectedTokenAddress);
+      trackEvent("copy_token_address", {
+        ...tokenAnalyticsProperties(selectedTokenAddress, selectedToken?.symbol)
+      });
+      setTokenAddressCopyState("copied");
+      window.setTimeout(() => setTokenAddressCopyState("idle"), 1600);
+    } catch {
+      setTokenAddressCopyState("failed");
+    }
+  }
+
   async function copyTokenLink() {
     const addressToCopy = selectedTokenAddress ?? normalizedAddress;
     if (!isEvmAddress(addressToCopy)) return;
@@ -959,40 +1064,204 @@ function ScoutApp() {
   }
 
   return (
-    <main className="shell">
-      <nav className="topbar" aria-label="Primary navigation">
-        <div className="brand">
+    <main className={`app-frame ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <button
+        aria-label="Close navigation"
+        className={`sidebar-backdrop ${sidebarOpen ? "visible" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+        type="button"
+      />
+
+      <aside className={`app-sidebar ${sidebarOpen ? "open" : ""}`} id="primary-sidebar">
+        <a className="sidebar-brand" href="/" onClick={handleScanNav} title="BaseScout home">
           <span className="brand-mark" aria-hidden="true">
             <img src="/basescout-logo.png?v=2" alt="" width="32" height="32" />
           </span>
-          <span>BaseScout</span>
-        </div>
-        <div className="topbar-actions">
-          {isTrendingPage ? (
-            <a className="header-action-button nav-link" href="/" onClick={handleScanNav}>
-              Scan
+          <span className="brand-copy">
+            <strong>BaseScout</strong>
+            <small>Onchain intelligence</small>
+          </span>
+        </a>
+
+        <nav className="sidebar-nav" aria-label="BaseScout workspace">
+          <div className="sidebar-group">
+            <p>Research</p>
+            <a
+              aria-current={!isTrendingPage && !activeWorkspacePanel ? "page" : undefined}
+              className={!isTrendingPage && !activeWorkspacePanel ? "sidebar-link active" : "sidebar-link"}
+              href="/"
+              onClick={handleScanNav}
+              title="Token scanner"
+            >
+              <ScanLine size={17} />
+              <span>Token scanner</span>
             </a>
-          ) : (
-            <a className="header-action-button nav-link" href="/trending" onClick={handleTrendingNav}>
-              Trending
+            <a
+              aria-current={isTrendingPage ? "page" : undefined}
+              className={isTrendingPage ? "sidebar-link active" : "sidebar-link"}
+              href="/trending"
+              onClick={handleTrendingNav}
+              title="Trending pools"
+            >
+              <Activity size={17} />
+              <span>Trending pools</span>
             </a>
-          )}
-          <a className="header-action-button nav-link basepaint-nav-link" href="/basepaint">
-            BasePaint
-          </a>
-          <a className="header-action-button header-x-link" href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="Updates on X">
+          </div>
+
+          <div className="sidebar-group">
+            <p>Workspace</p>
+            <a className="sidebar-link" href="/#overview" onClick={(event) => handleSectionNav(event, "overview")} title="Overview">
+              <LayoutDashboard size={17} />
+              <span>Overview</span>
+            </a>
+            <a
+              aria-current={activeWorkspacePanel === "saved" ? "page" : undefined}
+              className={activeWorkspacePanel === "saved" ? "sidebar-link active" : "sidebar-link"}
+              href="/#saved-research"
+              onClick={(event) => handleWorkspacePanelNav(event, "saved")}
+              title="Saved research"
+            >
+              <Bookmark size={17} />
+              <span>Saved research</span>
+              <b>{watchlist.length + scanHistory.length}</b>
+            </a>
+            <a
+              aria-current={activeWorkspacePanel === "risk" ? "page" : undefined}
+              className={activeWorkspacePanel === "risk" ? "sidebar-link active" : "sidebar-link"}
+              href="/#risk-breakdown"
+              onClick={(event) => handleWorkspacePanelNav(event, "risk")}
+              title="Risk breakdown"
+            >
+              <AlertTriangle size={17} />
+              <span>Risk breakdown</span>
+            </a>
+            <a
+              aria-current={activeWorkspacePanel === "security" ? "page" : undefined}
+              className={activeWorkspacePanel === "security" ? "sidebar-link active" : "sidebar-link"}
+              href="/#security"
+              onClick={(event) => handleWorkspacePanelNav(event, "security")}
+              title="Security intelligence"
+            >
+              <ShieldCheck size={17} />
+              <span>Security</span>
+            </a>
+          </div>
+
+          <div className="sidebar-group">
+            <p>Explore</p>
+            <a className="sidebar-link basepaint-sidebar-link" href="/basepaint" title="BasePaint explorer">
+              <Palette size={17} />
+              <span>BasePaint</span>
+              <ArrowUpRight size={14} />
+            </a>
+          </div>
+        </nav>
+
+        <div className="sidebar-footer">
+          <a href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="BaseScout updates on X" title="Updates on X">
             <X size={16} />
             <span>Updates on X</span>
           </a>
-          <div className="network-pill">
-            <span className="status-dot" />
-            Base mainnet
-          </div>
         </div>
-      </nav>
-      <p className="data-note">Data from DEX Screener and BaseScan.</p>
+      </aside>
 
-      {isTrendingPage ? (
+      <section className="workspace-shell">
+        <header className="workspace-header">
+          <button
+            aria-controls="primary-sidebar"
+            aria-expanded={sidebarOpen}
+            aria-label={sidebarCollapsed ? "Expand navigation" : "Toggle navigation"}
+            className="sidebar-toggle"
+            onClick={toggleSidebar}
+            type="button"
+          >
+            <Menu className="mobile-menu-icon" size={18} />
+            <PanelLeftClose className="desktop-menu-icon" size={18} />
+          </button>
+          <div className="workspace-title">
+            <span>
+              BaseScout / {activeWorkspacePanel === "saved" ? "Workspace" : activeWorkspacePanel ? "Analysis" : isTrendingPage ? "Markets" : "Research"}
+            </span>
+            <h1>
+              {activeWorkspacePanel === "saved"
+                ? "Saved Research"
+                : activeWorkspacePanel === "risk"
+                  ? "Risk Breakdown"
+                  : activeWorkspacePanel === "security"
+                    ? "Security Intelligence"
+                    : isTrendingPage
+                      ? "Trending Base Pools"
+                      : "Token Intelligence"}
+            </h1>
+          </div>
+          <div className="workspace-header-meta">
+            <span className="source-status"><i aria-hidden="true" /> DEX Screener + BaseScan</span>
+            <span className="network-pill"><span className="status-dot" /> Base mainnet</span>
+          </div>
+        </header>
+
+        <div className="workspace-content">
+
+      {activeWorkspacePanel === "saved" ? (
+        <section className="standalone-analysis saved-research-view" id="saved-research" aria-labelledby="saved-research-title">
+          <div className="analysis-view-head">
+            <div>
+              <p className="section-kicker">Saved research</p>
+              <h2 id="saved-research-title">Watchlist and recent scans</h2>
+              <span>Return to saved Base tokens or continue from your latest successful scans.</span>
+            </div>
+            <a href="/#overview" onClick={(event) => handleSectionNav(event, "overview")}>
+              Back to overview
+            </a>
+          </div>
+          <section className="workspace-secondary" aria-label="Saved research collections">
+            <WatchlistSection
+              disabled={isLoading}
+              onRemove={removeWatchlistListItem}
+              onRescan={rescanWatchlistItem}
+              watchlist={watchlist}
+            />
+            <RecentScans
+              disabled={isLoading}
+              history={scanHistory}
+              onClear={clearHistory}
+              onRescan={rescanHistoryItem}
+            />
+          </section>
+        </section>
+      ) : activeWorkspacePanel === "risk" ? (
+        <section className="standalone-analysis" id="risk-breakdown" aria-labelledby="risk-breakdown-title">
+          <div className="analysis-view-head">
+            <div>
+              <p className="section-kicker">Risk breakdown</p>
+              <h2 id="risk-breakdown-title">Transparent scoring</h2>
+              <span>See every market, contract, and confidence signal behind the current result.</span>
+            </div>
+            <a href="/#overview" onClick={(event) => handleSectionNav(event, "overview")}>
+              Back to overview
+            </a>
+          </div>
+          <article className="panel risk-breakdown-panel standalone-analysis-card">
+            <RiskBreakdown result={result} loading={isLoading} />
+          </article>
+        </section>
+      ) : activeWorkspacePanel === "security" ? (
+        <section className="standalone-analysis" id="security" aria-labelledby="security-intelligence-title">
+          <div className="analysis-view-head">
+            <div>
+              <p className="section-kicker">Security Intelligence</p>
+              <h2 id="security-intelligence-title">Automated contract signals</h2>
+              <span>Review honeypot, transfer, ownership, proxy, and contract-level signals in one focused panel.</span>
+            </div>
+            <a href="/#overview" onClick={(event) => handleSectionNav(event, "overview")}>
+              Back to overview
+            </a>
+          </div>
+          <article className="panel security-panel standalone-analysis-card">
+            <SecurityIntelligencePanel security={result?.security} loading={isLoading} />
+          </article>
+        </section>
+      ) : isTrendingPage ? (
         <TrendingPage
           data={trendingData}
           error={trendingError}
@@ -1001,10 +1270,13 @@ function ScoutApp() {
         />
       ) : (
         <>
-      <section className="hero">
+      <section className="hero" id="scanner">
+        <span className="hero-hands" aria-hidden="true" />
         <div className="hero-copy">
-          <p className="eyebrow">Base token risk scanner</p>
-          <h1>Scan the token. Read the risk. Then decide.</h1>
+          <h1>Scan the token. <span>Read the risk.</span> Then decide.</h1>
+          <p className="hero-lede">
+            Liquidity, contract signals, and transparent scoring in one research surface.
+          </p>
         </div>
 
         <form className="scanner" onSubmit={handleScan}>
@@ -1063,21 +1335,100 @@ function ScoutApp() {
         </form>
       </section>
 
-      <RecentScans
-        disabled={isLoading}
-        history={scanHistory}
-        onClear={clearHistory}
-        onRescan={rescanHistoryItem}
-      />
+      {status === "success" && result ? (
+        <section className="scan-action-bar" aria-label="Selected token actions">
+          <div className="scan-action-identity">
+            <span className="scan-token-symbol">{selectedToken?.symbol ?? "Token"}</span>
+            <span>
+              <strong>{selectedToken?.name ?? "Unknown token"}</strong>
+              <small>{shortAddress(selectedTokenAddress) ?? "Address unavailable"}</small>
+            </span>
+          </div>
 
-      <WatchlistSection
-        disabled={isLoading}
-        onRemove={removeWatchlistListItem}
-        onRescan={rescanWatchlistItem}
-        watchlist={watchlist}
-      />
+          <div className="scan-pair-summary" aria-label="Selected liquidity pool">
+            <span>{selectedPair?.dexId ?? "DEX unavailable"}</span>
+            <i aria-hidden="true" />
+            <span>Pool age {pairAgeText(selectedPair?.pairCreatedAt)}</span>
+          </div>
 
-      <section className="dashboard" aria-live="polite">
+          <div className="scan-action-buttons">
+            <button
+              aria-pressed={Boolean(selectedWatchlistItem)}
+              className={selectedWatchlistItem ? "scan-action-button saved" : "scan-action-button"}
+              onClick={selectedWatchlistItem ? removeCurrentFromWatchlist : addCurrentToWatchlist}
+              type="button"
+            >
+              {selectedWatchlistItem ? <Check size={16} /> : <Bookmark size={16} />}
+              {selectedWatchlistItem ? "Saved" : "Save"}
+            </button>
+
+            {baseScanUrl ? (
+              <a
+                className="scan-action-button"
+                href={baseScanUrl}
+                onClick={() =>
+                  trackEvent("open_basescan", {
+                    ...tokenAnalyticsProperties(baseScanTokenAddress, selectedToken?.symbol),
+                    location: "action_bar"
+                  })
+                }
+                target="_blank"
+                rel="noreferrer"
+              >
+                BaseScan
+                <ExternalLink size={15} />
+              </a>
+            ) : null}
+
+            {selectedPair?.url ? (
+              <a
+                className="scan-action-button primary"
+                href={selectedPair.url}
+                onClick={() =>
+                  trackEvent("open_dexscreener", {
+                    ...tokenAnalyticsProperties(selectedToken?.address ?? normalizedAddress, selectedToken?.symbol),
+                    location: "action_bar"
+                  })
+                }
+                target="_blank"
+                rel="noreferrer"
+              >
+                DEX Screener
+                <ExternalLink size={15} />
+              </a>
+            ) : null}
+
+            {shareOnXUrl ? (
+              <a className="scan-action-button" href={shareOnXUrl} target="_blank" rel="noopener noreferrer">
+                <X size={15} />
+                Share
+              </a>
+            ) : null}
+
+            <details className="scan-more-actions">
+              <summary aria-label="More token actions" title="More actions">
+                <MoreHorizontal size={18} />
+              </summary>
+              <div className="scan-more-menu">
+                <button disabled={!selectedTokenAddress} onClick={() => void copyTokenLink()} type="button">
+                  {linkCopyState === "copied" ? <Check size={15} /> : <Copy size={15} />}
+                  {linkCopyState === "copied" ? "Link copied" : linkCopyState === "failed" ? "Copy failed" : "Copy BaseScout link"}
+                </button>
+                <button disabled={!selectedTokenAddress} onClick={() => void copyTokenAddress()} type="button">
+                  {tokenAddressCopyState === "copied" ? <Check size={15} /> : <Copy size={15} />}
+                  {tokenAddressCopyState === "copied" ? "Address copied" : tokenAddressCopyState === "failed" ? "Copy failed" : "Copy token address"}
+                </button>
+                <button disabled={!selectedPair?.pairAddress} onClick={() => void copyPairAddress()} type="button">
+                  {copyState === "copied" ? <Check size={15} /> : <Copy size={15} />}
+                  {copyState === "copied" ? "Pool address copied" : copyState === "failed" ? "Copy failed" : "Copy pool address"}
+                </button>
+              </div>
+            </details>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="dashboard" id="overview" aria-live="polite">
         <article className={`risk-card ${result ? scoreTone(result.riskLevel) : ""} ${isLoading ? "loading" : ""}`}>
           <div className="card-heading">
             <div>
@@ -1154,135 +1505,17 @@ function ScoutApp() {
         </section>
       </section>
 
-      <MarketsSection
-        loading={isLoading}
-        pairs={selectedPairs}
-        primaryPair={selectedPair}
-        tokenAddress={selectedToken?.address ?? normalizedAddress}
-        tokenSymbol={selectedToken?.symbol}
-      />
+      <div id="markets">
+        <MarketsSection
+          loading={isLoading}
+          pairs={selectedPairs}
+          primaryPair={selectedPair}
+          tokenAddress={selectedToken?.address ?? normalizedAddress}
+          tokenSymbol={selectedToken?.symbol}
+        />
+      </div>
 
       <section className="detail-grid">
-        <article className="panel risk-breakdown-panel">
-          <div className="panel-head">
-            <div>
-              <p className="section-kicker">Risk breakdown</p>
-              <h2>Transparent scoring</h2>
-            </div>
-            <AlertTriangle size={22} />
-          </div>
-
-          <RiskBreakdown result={result} loading={isLoading} />
-        </article>
-
-        <article className="panel snapshot">
-          <div className="panel-head">
-            <div>
-              <p className="section-kicker">Token snapshot</p>
-              <h2>Selected Base pair</h2>
-            </div>
-            <Clock3 size={22} />
-          </div>
-
-          <dl className="snapshot-list">
-            <SnapshotRow label="Token" value={selectedToken?.name ?? "Unavailable"} loading={isLoading} />
-            <SnapshotRow label="Symbol" value={selectedToken?.symbol ?? "Unavailable"} loading={isLoading} />
-            <SnapshotRow label="DEX" value={selectedPair?.dexId ?? "Unavailable"} loading={isLoading} />
-            <SnapshotRow label="Pair age" value={pairAgeText(selectedPair?.pairCreatedAt)} loading={isLoading} />
-            <SnapshotRow label="Pair address" value={selectedPair?.pairAddress ?? "Unavailable"} loading={isLoading} mono />
-          </dl>
-
-          <div className="snapshot-actions">
-            {selectedWatchlistItem ? (
-              <button
-                className="snapshot-action"
-                disabled={!result || isLoading}
-                onClick={removeCurrentFromWatchlist}
-                type="button"
-              >
-                <Trash2 size={16} />
-                Remove from watchlist
-              </button>
-            ) : (
-              <button
-                className="snapshot-action"
-                disabled={!result || isLoading}
-                onClick={addCurrentToWatchlist}
-                type="button"
-              >
-                <CheckCircle2 size={16} />
-                Add to watchlist
-              </button>
-            )}
-
-            <button
-              className="snapshot-action"
-              disabled={!result || !selectedTokenAddress || isLoading}
-              onClick={() => void copyTokenLink()}
-              type="button"
-            >
-              {linkCopyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
-              {linkCopyState === "copied" ? "Link copied" : linkCopyState === "failed" ? "Copy failed" : "Copy link"}
-            </button>
-
-            {shareOnXUrl ? (
-              <a className="snapshot-action" href={shareOnXUrl} target="_blank" rel="noopener noreferrer">
-                <X size={16} />
-                Share on X
-              </a>
-            ) : null}
-
-            <button
-              className="snapshot-action"
-              disabled={!selectedPair?.pairAddress || isLoading}
-              onClick={() => void copyPairAddress()}
-              type="button"
-            >
-              {copyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
-              {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy pair address"}
-            </button>
-
-            {baseScanUrl ? (
-              <a
-                className="snapshot-action primary-action"
-                href={baseScanUrl}
-                onClick={() =>
-                  trackEvent("open_basescan", {
-                    ...tokenAnalyticsProperties(baseScanTokenAddress, selectedToken?.symbol),
-                    location: "snapshot"
-                  })
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open on BaseScan
-                <ExternalLink size={16} />
-              </a>
-            ) : (
-              <span className="snapshot-action disabled">BaseScan unavailable</span>
-            )}
-
-            {selectedPair?.url ? (
-              <a
-                className="snapshot-action primary-action"
-                href={selectedPair.url}
-                onClick={() =>
-                  trackEvent("open_dexscreener", {
-                    ...tokenAnalyticsProperties(selectedToken?.address ?? normalizedAddress, selectedToken?.symbol)
-                  })
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open on DEX Screener
-                <ExternalLink size={16} />
-              </a>
-            ) : (
-              <span className="snapshot-action primary-action disabled">DEX Screener unavailable</span>
-            )}
-          </div>
-        </article>
-
         <article className="panel intelligence">
           <div className="panel-head">
             <div>
@@ -1331,17 +1564,6 @@ function ScoutApp() {
           </dl>
         </article>
 
-        <article className="panel security-panel">
-          <div className="panel-head">
-            <div>
-              <p className="section-kicker">Security Intelligence</p>
-              <h2>Automated contract signals</h2>
-            </div>
-            <ShieldX size={22} />
-          </div>
-
-          <SecurityIntelligencePanel security={result?.security} loading={isLoading} />
-        </article>
       </section>
         </>
       )}
@@ -1350,6 +1572,8 @@ function ScoutApp() {
         <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
         <span>Not financial advice.</span>
       </footer>
+        </div>
+      </section>
     </main>
   );
 }
@@ -1611,7 +1835,7 @@ function WatchlistSection({
   watchlist: WatchlistItem[];
 }) {
   return (
-    <section className="watchlist-section" aria-label="Watchlist">
+    <section className="watchlist-section" id="watchlist" aria-label="Watchlist">
       <div className="recent-head">
         <div>
           <p className="section-kicker">Watchlist</p>
@@ -1756,7 +1980,7 @@ function RecentScans({
   onRescan: (item: ScanHistoryItem) => void;
 }) {
   return (
-    <section className="recent-scans" aria-label="Recent scans">
+    <section className="recent-scans" id="recent-scans" aria-label="Recent scans">
       <div className="recent-head">
         <div>
           <p className="section-kicker">Recent scans</p>
