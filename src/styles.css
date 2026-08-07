@@ -3245,6 +3245,10 @@ body {
   margin-top: 12px;
 }
 
+.saved-research-view .workspace-secondary {
+  margin-top: 0;
+}
+
 .workspace-secondary .watchlist-section,
 .workspace-secondary .recent-scans {
   min-width: 0;
