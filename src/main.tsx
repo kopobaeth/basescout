@@ -30,7 +30,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShieldQuestion,
-  ShieldX,
   Trash2,
   WalletCards,
   X
@@ -92,6 +91,7 @@ const BasePaintPage = React.lazy(() =>
 type ScanStatus = "idle" | "loading" | "success" | "error";
 type CopyState = "idle" | "copied" | "failed";
 type ScanSource = "manual" | "example" | "history" | "route" | "watchlist";
+type WorkspacePanel = "risk" | "security";
 
 type ScanContext = {
   source: ScanSource;
@@ -185,6 +185,12 @@ function homePageUrl() {
 
 function isTrendingPath(pathname = window.location.pathname) {
   return pathname === trendingPath();
+}
+
+function workspacePanelFromHash(hash = window.location.hash): WorkspacePanel | null {
+  if (hash === "#risk-breakdown") return "risk";
+  if (hash === "#security") return "security";
+  return null;
 }
 
 function tokenRouteAddress(pathname = window.location.pathname) {
@@ -559,6 +565,7 @@ function App() {
 
 function ScoutApp() {
   const [routePath, setRoutePath] = useState(() => window.location.pathname);
+  const [activeWorkspacePanel, setActiveWorkspacePanel] = useState<WorkspacePanel | null>(() => workspacePanelFromHash());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [address, setAddress] = useState("");
@@ -672,6 +679,7 @@ function ScoutApp() {
   useEffect(() => {
     function handleTokenRoute() {
       setRoutePath(window.location.pathname);
+      setActiveWorkspacePanel(workspacePanelFromHash());
 
       if (isTrendingPath()) {
         cancelActiveScanForNavigation();
@@ -880,6 +888,7 @@ function ScoutApp() {
   function handleTrendingNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     setSidebarOpen(false);
+    setActiveWorkspacePanel(null);
     cancelActiveScanForNavigation();
     if (!isTrendingPage) {
       window.history.pushState({}, "", trendingPageUrl());
@@ -891,6 +900,7 @@ function ScoutApp() {
   function handleScanNav(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     setSidebarOpen(false);
+    setActiveWorkspacePanel(null);
     cancelActiveScanForNavigation();
     if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
       window.history.pushState({}, "", homePageUrl());
@@ -902,6 +912,7 @@ function ScoutApp() {
   function handleSectionNav(event: React.MouseEvent<HTMLAnchorElement>, sectionId: string) {
     event.preventDefault();
     setSidebarOpen(false);
+    setActiveWorkspacePanel(null);
 
     if (isTrendingPage) {
       window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
@@ -918,6 +929,20 @@ function ScoutApp() {
         block: "start"
       });
     }, 40);
+  }
+
+  function handleAnalysisNav(event: React.MouseEvent<HTMLAnchorElement>, panel: WorkspacePanel) {
+    event.preventDefault();
+    setSidebarOpen(false);
+    setActiveWorkspacePanel(panel);
+    setRoutePath("/");
+
+    const sectionId = panel === "risk" ? "risk-breakdown" : "security";
+    window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
+    restoreHomeMetadata();
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
   function toggleSidebar() {
@@ -1042,8 +1067,8 @@ function ScoutApp() {
           <div className="sidebar-group">
             <p>Research</p>
             <a
-              aria-current={!isTrendingPage ? "page" : undefined}
-              className={!isTrendingPage ? "sidebar-link active" : "sidebar-link"}
+              aria-current={!isTrendingPage && !activeWorkspacePanel ? "page" : undefined}
+              className={!isTrendingPage && !activeWorkspacePanel ? "sidebar-link active" : "sidebar-link"}
               href="/"
               onClick={handleScanNav}
               title="Token scanner"
@@ -1079,7 +1104,23 @@ function ScoutApp() {
               <span>Recent scans</span>
               <b>{scanHistory.length}</b>
             </a>
-            <a className="sidebar-link" href="/#security" onClick={(event) => handleSectionNav(event, "security")} title="Security intelligence">
+            <a
+              aria-current={activeWorkspacePanel === "risk" ? "page" : undefined}
+              className={activeWorkspacePanel === "risk" ? "sidebar-link active" : "sidebar-link"}
+              href="/#risk-breakdown"
+              onClick={(event) => handleAnalysisNav(event, "risk")}
+              title="Risk breakdown"
+            >
+              <AlertTriangle size={17} />
+              <span>Risk breakdown</span>
+            </a>
+            <a
+              aria-current={activeWorkspacePanel === "security" ? "page" : undefined}
+              className={activeWorkspacePanel === "security" ? "sidebar-link active" : "sidebar-link"}
+              href="/#security"
+              onClick={(event) => handleAnalysisNav(event, "security")}
+              title="Security intelligence"
+            >
               <ShieldCheck size={17} />
               <span>Security</span>
             </a>
@@ -1124,8 +1165,16 @@ function ScoutApp() {
             <PanelLeftClose className="desktop-menu-icon" size={18} />
           </button>
           <div className="workspace-title">
-            <span>BaseScout / {isTrendingPage ? "Markets" : "Research"}</span>
-            <h1>{isTrendingPage ? "Trending Base Pools" : "Token Intelligence"}</h1>
+            <span>BaseScout / {activeWorkspacePanel ? "Analysis" : isTrendingPage ? "Markets" : "Research"}</span>
+            <h1>
+              {activeWorkspacePanel === "risk"
+                ? "Risk Breakdown"
+                : activeWorkspacePanel === "security"
+                  ? "Security Intelligence"
+                  : isTrendingPage
+                    ? "Trending Base Pools"
+                    : "Token Intelligence"}
+            </h1>
           </div>
           <div className="workspace-header-meta">
             <span className="source-status"><i aria-hidden="true" /> DEX Screener + BaseScan</span>
@@ -1135,7 +1184,39 @@ function ScoutApp() {
 
         <div className="workspace-content">
 
-      {isTrendingPage ? (
+      {activeWorkspacePanel === "risk" ? (
+        <section className="standalone-analysis" id="risk-breakdown" aria-labelledby="risk-breakdown-title">
+          <div className="analysis-view-head">
+            <div>
+              <p className="section-kicker">Risk breakdown</p>
+              <h2 id="risk-breakdown-title">Transparent scoring</h2>
+              <span>See every market, contract, and confidence signal behind the current result.</span>
+            </div>
+            <a href="/#overview" onClick={(event) => handleSectionNav(event, "overview")}>
+              Back to overview
+            </a>
+          </div>
+          <article className="panel risk-breakdown-panel standalone-analysis-card">
+            <RiskBreakdown result={result} loading={isLoading} />
+          </article>
+        </section>
+      ) : activeWorkspacePanel === "security" ? (
+        <section className="standalone-analysis" id="security" aria-labelledby="security-intelligence-title">
+          <div className="analysis-view-head">
+            <div>
+              <p className="section-kicker">Security Intelligence</p>
+              <h2 id="security-intelligence-title">Automated contract signals</h2>
+              <span>Review honeypot, transfer, ownership, proxy, and contract-level signals in one focused panel.</span>
+            </div>
+            <a href="/#overview" onClick={(event) => handleSectionNav(event, "overview")}>
+              Back to overview
+            </a>
+          </div>
+          <article className="panel security-panel standalone-analysis-card">
+            <SecurityIntelligencePanel security={result?.security} loading={isLoading} />
+          </article>
+        </section>
+      ) : isTrendingPage ? (
         <TrendingPage
           data={trendingData}
           error={trendingError}
@@ -1317,18 +1398,6 @@ function ScoutApp() {
       </section>
 
       <section className="detail-grid">
-        <article className="panel risk-breakdown-panel">
-          <div className="panel-head">
-            <div>
-              <p className="section-kicker">Risk breakdown</p>
-              <h2>Transparent scoring</h2>
-            </div>
-            <AlertTriangle size={22} />
-          </div>
-
-          <RiskBreakdown result={result} loading={isLoading} />
-        </article>
-
         <article className="panel snapshot">
           <div className="panel-head">
             <div>
@@ -1485,17 +1554,6 @@ function ScoutApp() {
           </dl>
         </article>
 
-        <article className="panel security-panel" id="security">
-          <div className="panel-head">
-            <div>
-              <p className="section-kicker">Security Intelligence</p>
-              <h2>Automated contract signals</h2>
-            </div>
-            <ShieldX size={22} />
-          </div>
-
-          <SecurityIntelligencePanel security={result?.security} loading={isLoading} />
-        </article>
       </section>
         </>
       )}
