@@ -2319,6 +2319,24 @@ h2 {
   z-index: 1;
 }
 
+.hero > .hero-hands {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  opacity: 0.2;
+  background: url("/basescout-hands.webp") center 52% / cover no-repeat;
+  filter: saturate(0.9) contrast(1.05);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.76) 43%, #000 100%);
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.76) 43%, #000 100%);
+}
+
+.hero > .hero-copy,
+.hero > .scanner {
+  z-index: 2;
+}
+
 .eyebrow,
 .section-kicker {
   color: #72a0ff;
@@ -3678,6 +3696,10 @@ body {
 }
 
 @media (max-width: 680px) {
+  .hero > .hero-hands {
+    display: none;
+  }
+
   .app-frame,
   .app-frame.sidebar-collapsed {
     width: min(100% - 14px, 1180px);
