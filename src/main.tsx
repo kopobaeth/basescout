@@ -12,7 +12,6 @@ import {
   Bookmark,
   Check,
   CheckCircle2,
-  Clock3,
   Copy,
   ExternalLink,
   FileCheck2,
@@ -22,6 +21,7 @@ import {
   LayoutDashboard,
   Loader2,
   Menu,
+  MoreHorizontal,
   Palette,
   PanelLeftClose,
   RefreshCw,
@@ -575,6 +575,7 @@ function ScoutApp() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [baseScan, setBaseScan] = useState<BaseScanIntelligence>(() => emptyBaseScanIntelligence());
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [tokenAddressCopyState, setTokenAddressCopyState] = useState<CopyState>("idle");
   const [linkCopyState, setLinkCopyState] = useState<CopyState>("idle");
   const [trendingStatus, setTrendingStatus] = useState<TrendingStatus>("idle");
   const [trendingError, setTrendingError] = useState("");
@@ -697,6 +698,7 @@ function ScoutApp() {
 
       setAddress(routeAddress);
       setCopyState("idle");
+      setTokenAddressCopyState("idle");
       setLinkCopyState("idle");
 
       if (!isTokenContractAddress(routeAddress)) {
@@ -756,6 +758,7 @@ function ScoutApp() {
     setAddress(nextAddress);
     setErrorState(null);
     setCopyState("idle");
+    setTokenAddressCopyState("idle");
     setLinkCopyState("idle");
 
     if (status !== "idle" || result) {
@@ -780,6 +783,7 @@ function ScoutApp() {
     setAddress(tokenAddress);
     setErrorState(null);
     setCopyState("idle");
+    setTokenAddressCopyState("idle");
     setLinkCopyState("idle");
     trackEvent("scan_clicked", scanEventProperties);
 
@@ -1028,6 +1032,21 @@ function ScoutApp() {
       window.setTimeout(() => setCopyState("idle"), 1600);
     } catch {
       setCopyState("failed");
+    }
+  }
+
+  async function copyTokenAddress() {
+    if (!selectedTokenAddress) return;
+
+    try {
+      await writeClipboardText(selectedTokenAddress);
+      trackEvent("copy_token_address", {
+        ...tokenAnalyticsProperties(selectedTokenAddress, selectedToken?.symbol)
+      });
+      setTokenAddressCopyState("copied");
+      window.setTimeout(() => setTokenAddressCopyState("idle"), 1600);
+    } catch {
+      setTokenAddressCopyState("failed");
     }
   }
 
@@ -1316,6 +1335,99 @@ function ScoutApp() {
         </form>
       </section>
 
+      {status === "success" && result ? (
+        <section className="scan-action-bar" aria-label="Selected token actions">
+          <div className="scan-action-identity">
+            <span className="scan-token-symbol">{selectedToken?.symbol ?? "Token"}</span>
+            <span>
+              <strong>{selectedToken?.name ?? "Unknown token"}</strong>
+              <small>{shortAddress(selectedTokenAddress) ?? "Address unavailable"}</small>
+            </span>
+          </div>
+
+          <div className="scan-pair-summary" aria-label="Selected liquidity pool">
+            <span>{selectedPair?.dexId ?? "DEX unavailable"}</span>
+            <i aria-hidden="true" />
+            <span>Pool age {pairAgeText(selectedPair?.pairCreatedAt)}</span>
+          </div>
+
+          <div className="scan-action-buttons">
+            <button
+              aria-pressed={Boolean(selectedWatchlistItem)}
+              className={selectedWatchlistItem ? "scan-action-button saved" : "scan-action-button"}
+              onClick={selectedWatchlistItem ? removeCurrentFromWatchlist : addCurrentToWatchlist}
+              type="button"
+            >
+              {selectedWatchlistItem ? <Check size={16} /> : <Bookmark size={16} />}
+              {selectedWatchlistItem ? "Saved" : "Save"}
+            </button>
+
+            {baseScanUrl ? (
+              <a
+                className="scan-action-button"
+                href={baseScanUrl}
+                onClick={() =>
+                  trackEvent("open_basescan", {
+                    ...tokenAnalyticsProperties(baseScanTokenAddress, selectedToken?.symbol),
+                    location: "action_bar"
+                  })
+                }
+                target="_blank"
+                rel="noreferrer"
+              >
+                BaseScan
+                <ExternalLink size={15} />
+              </a>
+            ) : null}
+
+            {selectedPair?.url ? (
+              <a
+                className="scan-action-button primary"
+                href={selectedPair.url}
+                onClick={() =>
+                  trackEvent("open_dexscreener", {
+                    ...tokenAnalyticsProperties(selectedToken?.address ?? normalizedAddress, selectedToken?.symbol),
+                    location: "action_bar"
+                  })
+                }
+                target="_blank"
+                rel="noreferrer"
+              >
+                DEX Screener
+                <ExternalLink size={15} />
+              </a>
+            ) : null}
+
+            {shareOnXUrl ? (
+              <a className="scan-action-button" href={shareOnXUrl} target="_blank" rel="noopener noreferrer">
+                <X size={15} />
+                Share
+              </a>
+            ) : null}
+
+            <details className="scan-more-actions">
+              <summary aria-label="More token actions" title="More actions">
+                <MoreHorizontal size={18} />
+              </summary>
+              <div className="scan-more-menu">
+                <button disabled={!selectedTokenAddress} onClick={() => void copyTokenLink()} type="button">
+                  {linkCopyState === "copied" ? <Check size={15} /> : <Copy size={15} />}
+                  {linkCopyState === "copied" ? "Link copied" : linkCopyState === "failed" ? "Copy failed" : "Copy BaseScout link"}
+                </button>
+                <button disabled={!selectedTokenAddress} onClick={() => void copyTokenAddress()} type="button">
+                  {tokenAddressCopyState === "copied" ? <Check size={15} /> : <Copy size={15} />}
+                  {tokenAddressCopyState === "copied" ? "Address copied" : tokenAddressCopyState === "failed" ? "Copy failed" : "Copy token address"}
+                </button>
+                <button disabled={!selectedPair?.pairAddress} onClick={() => void copyPairAddress()} type="button">
+                  {copyState === "copied" ? <Check size={15} /> : <Copy size={15} />}
+                  {copyState === "copied" ? "Pool address copied" : copyState === "failed" ? "Copy failed" : "Copy pool address"}
+                </button>
+              </div>
+            </details>
+          </div>
+        </section>
+      ) : null}
+
       <section className="dashboard" id="overview" aria-live="polite">
         <article className={`risk-card ${result ? scoreTone(result.riskLevel) : ""} ${isLoading ? "loading" : ""}`}>
           <div className="card-heading">
@@ -1404,114 +1516,6 @@ function ScoutApp() {
       </div>
 
       <section className="detail-grid">
-        <article className="panel snapshot">
-          <div className="panel-head">
-            <div>
-              <p className="section-kicker">Token snapshot</p>
-              <h2>Selected Base pair</h2>
-            </div>
-            <Clock3 size={22} />
-          </div>
-
-          <dl className="snapshot-list">
-            <SnapshotRow label="Token" value={selectedToken?.name ?? "Unavailable"} loading={isLoading} />
-            <SnapshotRow label="Symbol" value={selectedToken?.symbol ?? "Unavailable"} loading={isLoading} />
-            <SnapshotRow label="DEX" value={selectedPair?.dexId ?? "Unavailable"} loading={isLoading} />
-            <SnapshotRow label="Pair age" value={pairAgeText(selectedPair?.pairCreatedAt)} loading={isLoading} />
-            <SnapshotRow label="Pair address" value={selectedPair?.pairAddress ?? "Unavailable"} loading={isLoading} mono />
-          </dl>
-
-          <div className="snapshot-actions">
-            {selectedWatchlistItem ? (
-              <button
-                className="snapshot-action"
-                disabled={!result || isLoading}
-                onClick={removeCurrentFromWatchlist}
-                type="button"
-              >
-                <Trash2 size={16} />
-                Remove from watchlist
-              </button>
-            ) : (
-              <button
-                className="snapshot-action"
-                disabled={!result || isLoading}
-                onClick={addCurrentToWatchlist}
-                type="button"
-              >
-                <CheckCircle2 size={16} />
-                Add to watchlist
-              </button>
-            )}
-
-            <button
-              className="snapshot-action"
-              disabled={!result || !selectedTokenAddress || isLoading}
-              onClick={() => void copyTokenLink()}
-              type="button"
-            >
-              {linkCopyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
-              {linkCopyState === "copied" ? "Link copied" : linkCopyState === "failed" ? "Copy failed" : "Copy link"}
-            </button>
-
-            {shareOnXUrl ? (
-              <a className="snapshot-action" href={shareOnXUrl} target="_blank" rel="noopener noreferrer">
-                <X size={16} />
-                Share on X
-              </a>
-            ) : null}
-
-            <button
-              className="snapshot-action"
-              disabled={!selectedPair?.pairAddress || isLoading}
-              onClick={() => void copyPairAddress()}
-              type="button"
-            >
-              {copyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
-              {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy pair address"}
-            </button>
-
-            {baseScanUrl ? (
-              <a
-                className="snapshot-action primary-action"
-                href={baseScanUrl}
-                onClick={() =>
-                  trackEvent("open_basescan", {
-                    ...tokenAnalyticsProperties(baseScanTokenAddress, selectedToken?.symbol),
-                    location: "snapshot"
-                  })
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open on BaseScan
-                <ExternalLink size={16} />
-              </a>
-            ) : (
-              <span className="snapshot-action disabled">BaseScan unavailable</span>
-            )}
-
-            {selectedPair?.url ? (
-              <a
-                className="snapshot-action primary-action"
-                href={selectedPair.url}
-                onClick={() =>
-                  trackEvent("open_dexscreener", {
-                    ...tokenAnalyticsProperties(selectedToken?.address ?? normalizedAddress, selectedToken?.symbol)
-                  })
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open on DEX Screener
-                <ExternalLink size={16} />
-              </a>
-            ) : (
-              <span className="snapshot-action primary-action disabled">DEX Screener unavailable</span>
-            )}
-          </div>
-        </article>
-
         <article className="panel intelligence">
           <div className="panel-head">
             <div>
