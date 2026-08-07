@@ -1273,7 +1273,6 @@ function ScoutApp() {
       <section className="hero" id="scanner">
         <span className="hero-hands" aria-hidden="true" />
         <div className="hero-copy">
-          <p className="eyebrow"><span aria-hidden="true">[</span> Base token intelligence <span aria-hidden="true">]</span></p>
           <h1>Scan the token. <span>Read the risk.</span> Then decide.</h1>
           <p className="hero-lede">
             Liquidity, contract signals, and transparent scoring in one research surface.
