@@ -6,6 +6,7 @@ type AnalyticsEventName =
   | "scan_failed"
   | "example_token_clicked"
   | "copy_pair_address"
+  | "copy_token_address"
   | "open_basescan"
   | "open_dexscreener"
   | "market_opened"
