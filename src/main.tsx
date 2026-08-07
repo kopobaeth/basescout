@@ -21,7 +21,9 @@ import {
   LayoutDashboard,
   Loader2,
   Menu,
+  Monitor,
   MoreHorizontal,
+  Moon,
   Palette,
   PanelLeftClose,
   RefreshCw,
@@ -30,6 +32,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShieldQuestion,
+  Sun,
+  SunMoon,
   Trash2,
   WalletCards,
   X
@@ -57,6 +61,7 @@ import { CURRENT_RISK_SCORE_VERSION, riskTone } from "./riskPresentation";
 import { ScanRequestCoordinator } from "./scanRequestCoordinator";
 import { isEvmAddress, isTokenContractAddress } from "./tokenAddress";
 import { loadTrendingPools } from "./trendingClient";
+import { applyThemePreference, readThemePreference, type ThemePreference } from "./theme";
 import "./styles.css";
 import type {
   BaseScanIntelligence,
@@ -569,6 +574,7 @@ function ScoutApp() {
   const [activeWorkspacePanel, setActiveWorkspacePanel] = useState<WorkspacePanel | null>(() => workspacePanelFromHash());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => readThemePreference());
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState<ScanStatus>("idle");
   const [errorState, setErrorState] = useState<ScanErrorView | null>(null);
@@ -585,6 +591,7 @@ function ScoutApp() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => readWatchlist());
   const scanRequestCoordinatorRef = useRef(new ScanRequestCoordinator());
   const securityAnalyticsRef = useRef("");
+  const appearanceMenuRef = useRef<HTMLDetailsElement>(null);
 
   const normalizedAddress = address.trim();
   const isTrendingPage = isTrendingPath(routePath);
@@ -753,6 +760,13 @@ function ScoutApp() {
       window.removeEventListener("keydown", handleSidebarKeydown);
     };
   }, [sidebarOpen]);
+
+  useEffect(() => applyThemePreference(themePreference), [themePreference]);
+
+  function selectTheme(nextTheme: ThemePreference) {
+    setThemePreference(nextTheme);
+    appearanceMenuRef.current?.removeAttribute("open");
+  }
 
   function resetForInput(nextAddress: string) {
     setAddress(nextAddress);
@@ -1158,6 +1172,37 @@ function ScoutApp() {
         </nav>
 
         <div className="sidebar-footer">
+          <details className="appearance-menu" ref={appearanceMenuRef}>
+            <summary className="appearance-trigger" title={`Appearance: ${themePreference}`}>
+              <SunMoon size={16} />
+              <span>Appearance</span>
+              <small>{themePreference}</small>
+            </summary>
+            <div className="appearance-popover" role="radiogroup" aria-label="Color theme">
+              <div>
+                <strong>Appearance</strong>
+                <span>Choose how BaseScout looks on this device.</span>
+              </div>
+              {([
+                { value: "system", label: "System", description: "Follow your device", icon: Monitor },
+                { value: "dark", label: "Dark", description: "Dark research workspace", icon: Moon },
+                { value: "light", label: "Light", description: "Bright research workspace", icon: Sun }
+              ] as const).map(({ value, label, description, icon: ThemeIcon }) => (
+                <button
+                  aria-checked={themePreference === value}
+                  className={themePreference === value ? "selected" : ""}
+                  key={value}
+                  onClick={() => selectTheme(value)}
+                  role="radio"
+                  type="button"
+                >
+                  <ThemeIcon size={17} />
+                  <span><strong>{label}</strong><small>{description}</small></span>
+                  {themePreference === value ? <Check size={16} /> : null}
+                </button>
+              ))}
+            </div>
+          </details>
           <a href="https://x.com/kopobaeth" target="_blank" rel="noopener noreferrer" aria-label="BaseScout updates on X" title="Updates on X">
             <X size={16} />
             <span>Updates on X</span>
