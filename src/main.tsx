@@ -91,7 +91,7 @@ const BasePaintPage = React.lazy(() =>
 type ScanStatus = "idle" | "loading" | "success" | "error";
 type CopyState = "idle" | "copied" | "failed";
 type ScanSource = "manual" | "example" | "history" | "route" | "watchlist";
-type WorkspacePanel = "risk" | "security";
+type WorkspacePanel = "saved" | "risk" | "security";
 
 type ScanContext = {
   source: ScanSource;
@@ -188,6 +188,7 @@ function isTrendingPath(pathname = window.location.pathname) {
 }
 
 function workspacePanelFromHash(hash = window.location.hash): WorkspacePanel | null {
+  if (hash === "#saved-research") return "saved";
   if (hash === "#risk-breakdown") return "risk";
   if (hash === "#security") return "security";
   return null;
@@ -931,13 +932,13 @@ function ScoutApp() {
     }, 40);
   }
 
-  function handleAnalysisNav(event: React.MouseEvent<HTMLAnchorElement>, panel: WorkspacePanel) {
+  function handleWorkspacePanelNav(event: React.MouseEvent<HTMLAnchorElement>, panel: WorkspacePanel) {
     event.preventDefault();
     setSidebarOpen(false);
     setActiveWorkspacePanel(panel);
     setRoutePath("/");
 
-    const sectionId = panel === "risk" ? "risk-breakdown" : "security";
+    const sectionId = panel === "saved" ? "saved-research" : panel === "risk" ? "risk-breakdown" : "security";
     window.history.pushState({}, "", `${homePageUrl()}#${sectionId}`);
     restoreHomeMetadata();
 
@@ -1094,21 +1095,22 @@ function ScoutApp() {
               <LayoutDashboard size={17} />
               <span>Overview</span>
             </a>
-            <a className="sidebar-link" href="/#watchlist" onClick={(event) => handleSectionNav(event, "watchlist")} title="Watchlist">
+            <a
+              aria-current={activeWorkspacePanel === "saved" ? "page" : undefined}
+              className={activeWorkspacePanel === "saved" ? "sidebar-link active" : "sidebar-link"}
+              href="/#saved-research"
+              onClick={(event) => handleWorkspacePanelNav(event, "saved")}
+              title="Saved research"
+            >
               <Bookmark size={17} />
-              <span>Watchlist</span>
-              <b>{watchlist.length}</b>
-            </a>
-            <a className="sidebar-link" href="/#recent-scans" onClick={(event) => handleSectionNav(event, "recent-scans")} title="Recent scans">
-              <History size={17} />
-              <span>Recent scans</span>
-              <b>{scanHistory.length}</b>
+              <span>Saved research</span>
+              <b>{watchlist.length + scanHistory.length}</b>
             </a>
             <a
               aria-current={activeWorkspacePanel === "risk" ? "page" : undefined}
               className={activeWorkspacePanel === "risk" ? "sidebar-link active" : "sidebar-link"}
               href="/#risk-breakdown"
-              onClick={(event) => handleAnalysisNav(event, "risk")}
+              onClick={(event) => handleWorkspacePanelNav(event, "risk")}
               title="Risk breakdown"
             >
               <AlertTriangle size={17} />
@@ -1118,7 +1120,7 @@ function ScoutApp() {
               aria-current={activeWorkspacePanel === "security" ? "page" : undefined}
               className={activeWorkspacePanel === "security" ? "sidebar-link active" : "sidebar-link"}
               href="/#security"
-              onClick={(event) => handleAnalysisNav(event, "security")}
+              onClick={(event) => handleWorkspacePanelNav(event, "security")}
               title="Security intelligence"
             >
               <ShieldCheck size={17} />
@@ -1158,15 +1160,19 @@ function ScoutApp() {
             <PanelLeftClose className="desktop-menu-icon" size={18} />
           </button>
           <div className="workspace-title">
-            <span>BaseScout / {activeWorkspacePanel ? "Analysis" : isTrendingPage ? "Markets" : "Research"}</span>
+            <span>
+              BaseScout / {activeWorkspacePanel === "saved" ? "Workspace" : activeWorkspacePanel ? "Analysis" : isTrendingPage ? "Markets" : "Research"}
+            </span>
             <h1>
-              {activeWorkspacePanel === "risk"
-                ? "Risk Breakdown"
-                : activeWorkspacePanel === "security"
-                  ? "Security Intelligence"
-                  : isTrendingPage
-                    ? "Trending Base Pools"
-                    : "Token Intelligence"}
+              {activeWorkspacePanel === "saved"
+                ? "Saved Research"
+                : activeWorkspacePanel === "risk"
+                  ? "Risk Breakdown"
+                  : activeWorkspacePanel === "security"
+                    ? "Security Intelligence"
+                    : isTrendingPage
+                      ? "Trending Base Pools"
+                      : "Token Intelligence"}
             </h1>
           </div>
           <div className="workspace-header-meta">
@@ -1177,7 +1183,34 @@ function ScoutApp() {
 
         <div className="workspace-content">
 
-      {activeWorkspacePanel === "risk" ? (
+      {activeWorkspacePanel === "saved" ? (
+        <section className="standalone-analysis saved-research-view" id="saved-research" aria-labelledby="saved-research-title">
+          <div className="analysis-view-head">
+            <div>
+              <p className="section-kicker">Saved research</p>
+              <h2 id="saved-research-title">Watchlist and recent scans</h2>
+              <span>Return to saved Base tokens or continue from your latest successful scans.</span>
+            </div>
+            <a href="/#overview" onClick={(event) => handleSectionNav(event, "overview")}>
+              Back to overview
+            </a>
+          </div>
+          <section className="workspace-secondary" aria-label="Saved research collections">
+            <WatchlistSection
+              disabled={isLoading}
+              onRemove={removeWatchlistListItem}
+              onRescan={rescanWatchlistItem}
+              watchlist={watchlist}
+            />
+            <RecentScans
+              disabled={isLoading}
+              history={scanHistory}
+              onClear={clearHistory}
+              onRescan={rescanHistoryItem}
+            />
+          </section>
+        </section>
+      ) : activeWorkspacePanel === "risk" ? (
         <section className="standalone-analysis" id="risk-breakdown" aria-labelledby="risk-breakdown-title">
           <div className="analysis-view-head">
             <div>
@@ -1369,21 +1402,6 @@ function ScoutApp() {
           tokenSymbol={selectedToken?.symbol}
         />
       </div>
-
-      <section className="workspace-secondary" aria-label="Saved research">
-        <WatchlistSection
-          disabled={isLoading}
-          onRemove={removeWatchlistListItem}
-          onRescan={rescanWatchlistItem}
-          watchlist={watchlist}
-        />
-        <RecentScans
-          disabled={isLoading}
-          history={scanHistory}
-          onClear={clearHistory}
-          onRescan={rescanHistoryItem}
-        />
-      </section>
 
       <section className="detail-grid">
         <article className="panel snapshot">
