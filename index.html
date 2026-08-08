@@ -5,13 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="base:app_id" content="6a59054058aaa84e3d0674e2" />
     <meta name="theme-color" content="#000000" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta
       name="description"
       content="BaseScout is a Base token risk scanner using DEX Screener liquidity data and secure serverless BaseScan contract intelligence."
     />
     <link rel="icon" href="/basescout-logo.png" type="image/png" />
     <title>BaseScout | Base Token Risk Scanner</title>
+    <script>
+      (() => {
+        const stored = localStorage.getItem("basescout.theme");
+        const preference = stored === "system" || stored === "light" ? stored : "dark";
+        const basePaint = location.pathname === "/basepaint" || location.pathname.startsWith("/basepaint/");
+        const resolved = basePaint
+          ? "dark"
+          : preference === "system"
+            ? matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+            : preference;
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.dataset.themePreference = preference;
+        document.documentElement.style.colorScheme = resolved;
+        document.querySelector('meta[name="theme-color"]').content = resolved === "dark" ? "#000000" : "#f4f7fb";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
