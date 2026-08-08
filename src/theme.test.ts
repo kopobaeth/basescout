@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { isThemePreference, resolveTheme } from "./theme";
+import { DEFAULT_THEME_PREFERENCE, isThemePreference, resolveTheme } from "./theme";
+
+assert.equal(DEFAULT_THEME_PREFERENCE, "dark");
 
 assert.equal(resolveTheme("system", true), "dark");
 assert.equal(resolveTheme("system", false), "light");
