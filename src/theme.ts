@@ -2,6 +2,7 @@ export type ThemePreference = "system" | "dark" | "light";
 export type ResolvedTheme = Exclude<ThemePreference, "system">;
 
 export const THEME_STORAGE_KEY = "basescout.theme";
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = "dark";
 
 export function isThemePreference(value: unknown): value is ThemePreference {
   return value === "system" || value === "dark" || value === "light";
@@ -15,9 +16,9 @@ export function resolveTheme(preference: ThemePreference, systemPrefersDark: boo
 export function readThemePreference(): ThemePreference {
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isThemePreference(stored) ? stored : "system";
+    return isThemePreference(stored) ? stored : DEFAULT_THEME_PREFERENCE;
   } catch {
-    return "system";
+    return DEFAULT_THEME_PREFERENCE;
   }
 }
 
