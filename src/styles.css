@@ -3427,6 +3427,28 @@ body {
   text-transform: none;
 }
 
+.recent-clear,
+.watchlist-actions button {
+  color: var(--vantage-text-secondary);
+  background: var(--app-control);
+  border-color: var(--vantage-border);
+  border-radius: 8px;
+}
+
+.recent-clear:not(:disabled):hover,
+.watchlist-actions button:not(:disabled):hover {
+  color: var(--vantage-text-primary);
+  background: var(--app-control-hover);
+  border-color: var(--app-hover-border);
+}
+
+.recent-clear:disabled,
+.watchlist-actions button:disabled {
+  color: var(--vantage-text-tertiary);
+  background: var(--vantage-surface-muted);
+  border-color: var(--vantage-border);
+}
+
 .input-shell,
 .scanner .example-token,
 .scanner button,
