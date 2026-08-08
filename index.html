@@ -15,7 +15,7 @@
     <script>
       (() => {
         const stored = localStorage.getItem("basescout.theme");
-        const preference = stored === "dark" || stored === "light" ? stored : "system";
+        const preference = stored === "system" || stored === "light" ? stored : "dark";
         const basePaint = location.pathname === "/basepaint" || location.pathname.startsWith("/basepaint/");
         const resolved = basePaint
           ? "dark"
