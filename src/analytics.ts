@@ -1,6 +1,11 @@
 import posthog from "posthog-js";
 
 type AnalyticsEventName =
+  | "basepaint_collect_connected"
+  | "basepaint_collect_failed"
+  | "basepaint_collect_reviewed"
+  | "basepaint_collect_submitted"
+  | "basepaint_collect_success"
   | "scan_clicked"
   | "scan_success"
   | "scan_failed"
@@ -20,6 +25,7 @@ type AnalyticsEventName =
 type AnalyticsProperties = Record<string, boolean | number | string | undefined>;
 
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+export const ANALYTICS_OPT_OUT_STORAGE_KEY = "basescout:analytics-opt-out";
 
 declare global {
   interface Window {
@@ -31,6 +37,40 @@ function cleanedProperties(properties: AnalyticsProperties) {
   return Object.fromEntries(
     Object.entries(properties).filter(([, value]) => value !== undefined && value !== "")
   );
+}
+
+function browserStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function analyticsPreferenceFromSearch(search: string) {
+  const value = new URLSearchParams(search).get("analytics")?.toLowerCase();
+  if (value === "off") return true;
+  if (value === "on") return false;
+  return null;
+}
+
+export function syncAnalyticsPreferenceFromUrl() {
+  if (typeof window === "undefined") return;
+  const preference = analyticsPreferenceFromSearch(window.location.search);
+  if (preference === null) return;
+
+  const storage = browserStorage();
+  if (preference) storage?.setItem(ANALYTICS_OPT_OUT_STORAGE_KEY, "true");
+  else storage?.removeItem(ANALYTICS_OPT_OUT_STORAGE_KEY);
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("analytics");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+export function analyticsOptedOut() {
+  return browserStorage()?.getItem(ANALYTICS_OPT_OUT_STORAGE_KEY) === "true";
 }
 
 export function shortAddress(address?: string) {
@@ -47,7 +87,7 @@ export function tokenAnalyticsProperties(address?: string, symbol?: string): Ana
 }
 
 export function initPostHog() {
-  if (window.__basescoutPostHogInitialized) return;
+  if (window.__basescoutPostHogInitialized || analyticsOptedOut()) return;
 
   const key = import.meta.env.VITE_POSTHOG_KEY?.trim();
   const host = import.meta.env.VITE_POSTHOG_HOST?.trim();
@@ -65,6 +105,6 @@ export function initPostHog() {
 }
 
 export function trackEvent(eventName: AnalyticsEventName, properties: AnalyticsProperties = {}) {
-  if (!window.__basescoutPostHogInitialized) return;
+  if (!window.__basescoutPostHogInitialized || analyticsOptedOut()) return;
   posthog.capture(eventName, cleanedProperties(properties));
 }
