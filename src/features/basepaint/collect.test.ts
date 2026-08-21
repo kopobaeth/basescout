@@ -5,10 +5,13 @@ import {
   BASEPAINT_COLLECT_QUANTITY,
   BASEPAINT_REWARDS_ABI,
   BASEPAINT_REWARDS_ADDRESS,
+  BASESCOUT_BUILDER_CODE,
+  BASESCOUT_DATA_SUFFIX,
   basePaintCollectCallsId,
   basePaintCollectQuoteChanged,
   basePaintCollectValueText,
   buildBasePaintCollectCall,
+  buildBasePaintCollectRequest,
   classifyBasePaintCollectError,
   parseBasePaintCollectCallsStatus,
   type BasePaintCollectQuote
@@ -42,6 +45,22 @@ const encoded = encodeFunctionData({
 const decoded = decodeFunctionData({ abi: BASEPAINT_REWARDS_ABI, data: encoded });
 assert.equal(decoded.functionName, "mintLatest");
 assert.deepEqual(decoded.args, [account, 1n, zeroAddress]);
+
+const request = buildBasePaintCollectRequest(account, quote);
+assert.equal(BASESCOUT_BUILDER_CODE, "bc_wwc19i4p");
+assert.equal(
+  BASESCOUT_DATA_SUFFIX,
+  "0x62635f77776331396934700b0080218021802180218021802180218021"
+);
+assert.equal(request.chainId, "0x2105");
+assert.equal(request.calls[0].to, BASEPAINT_REWARDS_ADDRESS);
+assert.equal(request.calls[0].value, "0x93cafac6a8000");
+assert.deepEqual(request.capabilities, {
+  dataSuffix: {
+    value: BASESCOUT_DATA_SUFFIX,
+    optional: true
+  }
+});
 
 assert.equal(basePaintCollectValueText(quote.totalValueWei), "0.0026 ETH");
 assert.equal(basePaintCollectQuoteChanged(quote, { ...quote, checkedAt: 9999 }), false);

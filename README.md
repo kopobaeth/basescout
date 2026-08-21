@@ -236,6 +236,11 @@ VITE_POSTHOG_HOST=https://us.i.posthog.com
 
 Tracked events:
 
+- `basepaint_collect_connected`
+- `basepaint_collect_reviewed`
+- `basepaint_collect_submitted`
+- `basepaint_collect_success`
+- `basepaint_collect_failed`
 - `scan_clicked`
 - `scan_success`
 - `scan_failed`
@@ -251,7 +256,19 @@ Tracked events:
 - `critical_warning_displayed`
 - `security_check_unavailable`
 
-Event payloads avoid full token addresses. They include the token symbol when available and a shortened address such as `0x1234...abcd`.
+Event payloads avoid wallet addresses and transaction hashes. Token events include the symbol when available and a shortened address such as `0x1234...abcd`. BasePaint collect events include only the canvas day, ETH value, funnel stage, outcome, and whether the connected account matches the inspected collector.
+
+To exclude internal testing from both Vercel Analytics and PostHog on a browser, open:
+
+```text
+https://basescout.app/?analytics=off
+```
+
+The preference is stored only in that browser and the query parameter is removed immediately. Re-enable analytics with `?analytics=on`.
+
+## Base Builder Attribution
+
+BasePaint collect calls include BaseScout Builder Code `bc_wwc19i4p` through the optional ERC-8021 `dataSuffix` capability. Base Account still presents the final transaction approval, and the target BasePaint contract and calldata are unchanged. Attribution lets Base associate successful onchain activity with BaseScout without adding a proprietary contract or custody layer.
 
 ## Deployment Notes
 
@@ -277,6 +294,9 @@ Static hosting:
 
 ### Unreleased
 
+- Added ERC-8021 attribution for BasePaint collect calls using Builder Code `bc_wwc19i4p`
+- Added connected, reviewed, submitted, success, and failure events for the BasePaint collect funnel
+- Added a browser-local analytics opt-out for clean internal testing metrics
 - Opened `base/skills#146` for native plugin review and hosted `basescout.app` allowlisting
 - Aligned the BaseScout plugin with the canonical Base MCP plugin specification, section order, risk enum, routing references, and contribution scope
 - Added a candidate read-only Base MCP plugin that checks BaseScout risk and confidence before optional wallet actions
