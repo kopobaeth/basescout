@@ -38,7 +38,14 @@ import {
   WalletCards,
   X
 } from "lucide-react";
-import { initPostHog, shortAddress, tokenAnalyticsProperties, trackEvent } from "./analytics";
+import {
+  analyticsOptedOut,
+  initPostHog,
+  shortAddress,
+  syncAnalyticsPreferenceFromUrl,
+  tokenAnalyticsProperties,
+  trackEvent
+} from "./analytics";
 import {
   buildScanHistoryItem,
   clearScanHistory,
@@ -2218,11 +2225,12 @@ function TrendingPage({
 const container = document.getElementById("root") as HTMLElement;
 const root = window.__basescoutRoot ?? createRoot(container);
 window.__basescoutRoot = root;
+syncAnalyticsPreferenceFromUrl();
 initPostHog();
 
 root.render(
   <React.StrictMode>
     <App />
-    <Analytics />
+    <Analytics beforeSend={(event) => (analyticsOptedOut() ? null : event)} />
   </React.StrictMode>
 );
