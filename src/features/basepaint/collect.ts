@@ -1,4 +1,5 @@
 import type { ProviderInterface } from "@base-org/account";
+import { Attribution } from "ox/erc8021";
 import {
   createPublicClient,
   encodeFunctionData,
@@ -20,6 +21,10 @@ export const BASEPAINT_REWARDS_ADDRESS =
 export const BASEPAINT_COLLECT_QUANTITY = 1n;
 export const BASEPAINT_REWARDS_RECIPIENT = zeroAddress;
 export const BASEPAINT_RPC_URL = "https://mainnet.base.org";
+export const BASESCOUT_BUILDER_CODE = "bc_wwc19i4p";
+export const BASESCOUT_DATA_SUFFIX = Attribution.toDataSuffix({
+  codes: [BASESCOUT_BUILDER_CODE]
+});
 
 export const BASEPAINT_ABI = [
   {
@@ -308,6 +313,35 @@ export function buildBasePaintCollectCall(account: Address, quote: BasePaintColl
   };
 }
 
+export function buildBasePaintCollectRequest(account: Address, quote: BasePaintCollectQuote) {
+  const call = buildBasePaintCollectCall(account, quote);
+  const data = encodeFunctionData({
+    abi: call.abi,
+    functionName: call.functionName,
+    args: call.args
+  });
+
+  return {
+    version: "2.0.0",
+    from: account,
+    chainId: numberToHex(base.id),
+    atomicRequired: true,
+    calls: [
+      {
+        to: call.address,
+        data,
+        value: numberToHex(call.value)
+      }
+    ],
+    capabilities: {
+      dataSuffix: {
+        value: BASESCOUT_DATA_SUFFIX,
+        optional: true
+      }
+    }
+  } as const;
+}
+
 export function basePaintCollectQuoteChanged(
   previous: BasePaintCollectQuote,
   current: BasePaintCollectQuote
@@ -346,29 +380,9 @@ export async function submitBasePaintCollect(account: Address, quote: BasePaintC
 
   const provider = await baseAccountProvider();
   await ensureBaseChain(provider);
-  const call = buildBasePaintCollectCall(account, quote);
-  const data = encodeFunctionData({
-    abi: call.abi,
-    functionName: call.functionName,
-    args: call.args
-  });
   const response = await provider.request({
     method: "wallet_sendCalls",
-    params: [
-      {
-        version: "2.0.0",
-        from: account,
-        chainId: numberToHex(base.id),
-        atomicRequired: true,
-        calls: [
-          {
-            to: call.address,
-            data,
-            value: numberToHex(call.value)
-          }
-        ]
-      }
-    ]
+    params: [buildBasePaintCollectRequest(account, quote)]
   });
   return basePaintCollectCallsId(response);
 }
