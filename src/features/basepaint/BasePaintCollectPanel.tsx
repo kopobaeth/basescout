@@ -12,7 +12,8 @@ import {
   WalletCards,
   XCircle
 } from "lucide-react";
-import type { Address, Hash, Hex } from "viem";
+import { formatEther, type Address, type Hash, type Hex } from "viem";
+import { trackEvent } from "../../analytics";
 import {
   BASEPAINT_REWARDS_ADDRESS,
   BASEPAINT_REWARDS_RECIPIENT,
@@ -50,6 +51,30 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [status, setStatus] = useState<CollectStatus>("disconnected");
   const [transactionHash, setTransactionHash] = useState<Hash | null>(null);
+
+  function analyticsProperties(currentQuote: BasePaintCollectQuote | null = quote) {
+    return {
+      canvas_day: currentQuote?.eligibleDay,
+      collect_value_eth: currentQuote ? Number(formatEther(currentQuote.totalValueWei)) : undefined,
+      account_matches_inspected:
+        account === null ? undefined : account.toLowerCase() === inspectedAddress.toLowerCase()
+    };
+  }
+
+  function trackConfirmation(
+    outcome: "failed" | "reverted" | "success",
+    currentQuote: BasePaintCollectQuote
+  ) {
+    if (outcome === "success") {
+      trackEvent("basepaint_collect_success", analyticsProperties(currentQuote));
+      return;
+    }
+    trackEvent("basepaint_collect_failed", {
+      ...analyticsProperties(currentQuote),
+      stage: "confirmation",
+      error_kind: outcome
+    });
+  }
 
   useEffect(() => {
     let active = true;
@@ -98,11 +123,19 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
       const connectedAccount = await connectBaseAccount();
       setAccount(connectedAccount);
       setStatus("connected");
+      trackEvent("basepaint_collect_connected", {
+        account_matches_inspected:
+          connectedAccount.toLowerCase() === inspectedAddress.toLowerCase()
+      });
       if (!quote) await refreshQuote();
     } catch (connectionError) {
       const classified = classifyBasePaintCollectError(connectionError);
       setError(classified.message);
       setStatus(classified.kind === "rejected" ? "rejected" : "error");
+      trackEvent("basepaint_collect_failed", {
+        stage: "connection",
+        error_kind: classified.kind
+      });
     }
   }
 
@@ -127,14 +160,24 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
     const nextQuote = await refreshQuote();
     if (!nextQuote) {
       setStatus("error");
+      trackEvent("basepaint_collect_failed", {
+        stage: "quote",
+        error_kind: "unavailable"
+      });
       return;
     }
     if (!nextQuote.eligible) {
       setError("The latest completed canvas has no contributions and cannot be collected.");
       setStatus("error");
+      trackEvent("basepaint_collect_failed", {
+        ...analyticsProperties(nextQuote),
+        stage: "quote",
+        error_kind: "empty_canvas"
+      });
       return;
     }
     setStatus("review");
+    trackEvent("basepaint_collect_reviewed", analyticsProperties(nextQuote));
   }
 
   async function confirmCollect() {
@@ -149,16 +192,23 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
         setAcknowledged(false);
         setError("Contract terms changed. Review the updated day and value before continuing.");
         setStatus("review");
+        trackEvent("basepaint_collect_failed", {
+          ...analyticsProperties(freshQuote),
+          stage: "quote_validation",
+          error_kind: "quote_changed"
+        });
         return;
       }
 
       const nextCallsId = await submitBasePaintCollect(account, freshQuote);
       setCallsId(nextCallsId);
       setStatus("pending");
+      trackEvent("basepaint_collect_submitted", analyticsProperties(freshQuote));
 
       try {
         const confirmation = await waitForBasePaintCollect(nextCallsId);
         setTransactionHash(confirmation.transactionHash);
+        trackConfirmation(confirmation.outcome, freshQuote);
         setStatus(
           confirmation.outcome === "success"
             ? "success"
@@ -179,6 +229,13 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
       const classified = classifyBasePaintCollectError(transactionError);
       setError(classified.message);
       setStatus(classified.kind === "rejected" ? "rejected" : "error");
+      if (classified.kind !== "timeout") {
+        trackEvent("basepaint_collect_failed", {
+          ...analyticsProperties(quote),
+          stage: "submission",
+          error_kind: classified.kind
+        });
+      }
     }
   }
 
@@ -189,6 +246,7 @@ export function BasePaintCollectPanel({ inspectedAddress }: { inspectedAddress: 
     try {
       const confirmation = await waitForBasePaintCollect(callsId);
       setTransactionHash(confirmation.transactionHash);
+      if (quote) trackConfirmation(confirmation.outcome, quote);
       setStatus(
         confirmation.outcome === "success"
           ? "success"
