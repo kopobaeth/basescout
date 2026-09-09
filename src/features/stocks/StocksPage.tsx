@@ -422,7 +422,7 @@ export function StocksPage() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Open market on DEX Screener <ArrowUpRight size={15} />
+                        DEX Screener <ArrowUpRight size={15} />
                       </a>
                     )}
                   </>

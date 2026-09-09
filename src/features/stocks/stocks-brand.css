@@ -74,7 +74,9 @@
 /* Base Docs hierarchy: brand/actions row, followed by understated section tabs. */
 .stock-hud.stock-docs-header { display:block; padding:0 38px; background:var(--surface-base); backdrop-filter:none; }
 .stock-docs-top { display:flex; align-items:center; justify-content:space-between; gap:20px; min-height:62px; }
+.stock-docs-top { min-height:44px; }
 .stock-docs-actions { display:flex; align-items:center; gap:10px; pointer-events:auto; }
+.stock-docs-actions { position:absolute;right:32px;top:50%;transform:translateY(-50%); }
 .stock-docs-header .stocks-brand { gap:10px; font-size:22px; }
 .stock-uploaded-logo { position:relative; display:block; width:34px; height:34px; flex:0 0 34px; overflow:hidden; border-radius:7px; }
 .stocks-brand .stock-uploaded-logo img { position:absolute; width:46px; height:46px; max-width:none; left:-6px; top:-5.5px; border-radius:0; box-shadow:none; }
@@ -83,8 +85,27 @@
 .stock-docs-header .stock-theme-button { display:grid; place-items:center; width:36px; min-height:36px; padding:0; border:0; border-radius:50%; color:var(--muted); background:transparent; }
 .stock-docs-header .stock-theme-button:hover { background:var(--surface-hover); color:var(--ink); }
 .stock-hud.stock-docs-header nav { display:flex; margin:0; width:auto; justify-content:flex-start; gap:26px; min-height:40px; font-size:13px; overflow-x:auto; scrollbar-width:none; }
+.stock-hud.stock-docs-header nav { min-height:34px;gap:6px;padding:0 150px 6px 0;font-size:12px; }
 .stock-docs-header nav a { position:relative; display:flex; align-items:center; padding:10px 0 13px; white-space:nowrap; font-weight:400; color:var(--muted); }
 .stock-docs-header nav a:hover { color:var(--ink); }
 .stock-docs-header nav a[aria-current] { color:var(--ink); font-weight:600; }
 .stock-docs-header nav a[aria-current]::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; background:#0000ff; }
+.stock-docs-header nav a { font-family:Inter,system-ui,sans-serif;font-weight:500;letter-spacing:-.15px;padding:6px 11px;border-radius:7px;line-height:1.4; }
+.stock-docs-header nav a:hover { background:var(--surface-hover); }
+.stock-docs-header nav a[aria-current] { color:var(--vantage-accent);background:color-mix(in srgb,var(--base-blue) 11%,transparent);font-weight:600; }
+.stock-docs-header nav a[aria-current]::after { display:none; }
+.stocks-detail-grid > .stocks-panel { display:flex;flex-direction:column; }
+.stocks-detail-grid > .stocks-panel > .stocks-actions:last-child { margin-top:auto;padding-top:18px; }
+.stocks-detail-grid .stocks-market-link { margin-top:auto;align-self:flex-start; }
+.stocks-detail-grid .stocks-button-primary { display:inline-flex;align-items:center;justify-content:center;gap:7px;font:600 13px/1.4 Inter,system-ui,sans-serif;padding:11px 15px;min-height:42px;border-radius:9px; }
+.stock-money { opacity:.82;filter:drop-shadow(18px 12px 0 #0052ff30);background:conic-gradient(from 25deg,#0000ff 0 23%,#b69af6 23% 49%,#28bb85 49% 68%,#e8deb4 68% 76%,#0000ff 76%); }
+.stock-money::after { content:'';position:absolute;inset:40px;border:13px double #ffffff99;border-radius:inherit; }
+.stock-money-four { left:2030px;top:70px;width:350px;height:350px;transform:rotate(32deg) scaleX(.46); }
+.stock-money-note-two { left:1030px;top:990px;width:760px;height:340px;transform:rotate(-18deg) skewY(6deg); }
+.stock-money-note-two span { font-size:180px;width:250px; }
+.stock-money-one { left:2780px;top:1030px;transform:rotate(-28deg) scaleX(.7); }
+.stock-orbit { position:absolute;pointer-events:none;border:2px dashed #0052ff33;border-radius:50%;width:1200px;height:560px;transform:rotate(-24deg); }
+.stock-orbit-one { left:850px;top:880px; }.stock-orbit-two { left:3400px;top:2500px;transform:rotate(30deg);border-color:#b69af644; }
+[data-theme="dark"] .stock-money { opacity:.62; }
 @media(max-width:650px) { .stock-hud.stock-docs-header { padding:0 16px; } .stock-docs-top { min-height:58px; } .stock-docs-header .stocks-brand { font-size:20px; } .stock-hud.stock-docs-header nav { gap:23px; font-size:12px; } }
+@media(max-width:650px) { .stock-docs-top { min-height:44px; }.stock-docs-actions { right:12px;top:24px; }.stock-hud.stock-docs-header nav { padding-right:0;gap:2px;font-size:11px; }.stock-docs-header nav a { padding:6px 9px; }.stock-docs-header .stocks-brand { font-size:18px;gap:6px; } }

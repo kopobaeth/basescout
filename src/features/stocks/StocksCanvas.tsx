@@ -158,6 +158,9 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
           <div className="stock-money stock-money-note"><span>$</span></div>
           <div className="stock-money stock-money-coin stock-money-two"><span>◈</span></div>
           <div className="stock-money stock-money-coin stock-money-three"><span>$</span></div>
+          <div className="stock-money stock-money-coin stock-money-four"><span>◈</span></div>
+          <div className="stock-money stock-money-note stock-money-note-two"><span>$</span></div>
+          <div className="stock-orbit stock-orbit-one" /><div className="stock-orbit stock-orbit-two" />
           <div className="stock-world-title">EQUITIES.<br /><span>WITHOUT WALLS.</span><small>BASESCOUT / TOKENIZED STOCK RESEARCH</small></div>
           {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className={`stock-exhibit stock-exhibit-${i % 3}`} style={{left:a.x - 380, top:a.y - 225}}>
             <small>{String(i+1).padStart(2,"0")} — BASE / B20</small><strong>{a.symbol.replace(/c$/,"")}</strong><div><span>{a.name}</span><span>Open report ↗</span></div>
