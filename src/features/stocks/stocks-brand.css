@@ -95,7 +95,7 @@
 .stock-docs-header nav a[aria-current] { color:var(--vantage-accent);background:color-mix(in srgb,var(--base-blue) 11%,transparent);font-weight:600; }
 .stock-docs-header nav a[aria-current]::after { display:none; }
 .stocks-detail-grid > .stocks-panel { display:flex;flex-direction:column; }
-.stocks-detail-grid > .stocks-panel > .stocks-actions:last-child { margin-top:auto;padding-top:18px; }
+.stocks-detail-grid > .stocks-panel > .stocks-actions:last-child { margin-top:auto;margin-bottom:0;padding-top:18px; }
 .stocks-detail-grid .stocks-market-link { margin-top:auto;align-self:flex-start; }
 .stocks-detail-grid .stocks-button-primary { display:inline-flex;align-items:center;justify-content:center;gap:7px;font:600 13px/1.4 Inter,system-ui,sans-serif;padding:11px 15px;min-height:42px;border-radius:9px; }
 .stock-money { opacity:.82;filter:drop-shadow(18px 12px 0 #0052ff30);background:conic-gradient(from 25deg,#0000ff 0 23%,#b69af6 23% 49%,#28bb85 49% 68%,#e8deb4 68% 76%,#0000ff 76%); }
