@@ -159,6 +159,9 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
           <div className="stock-money stock-money-coin stock-money-four"><span>◈</span></div>
           <div className="stock-money stock-money-note stock-money-note-two"><span>$</span></div>
           <div className="stock-orbit stock-orbit-one" /><div className="stock-orbit stock-orbit-two" />
+          <div className="stock-ambient-type stock-ambient-type-one">BUILT<br />ON BASE</div>
+          <div className="stock-ambient-type stock-ambient-type-two">TOKENIZED STOCKS</div>
+          <div className="stock-ambient-type stock-ambient-type-three">ONCHAIN EQUITIES</div>
           <div className="stock-world-title">EQUITIES.<br /><span>WITHOUT WALLS.</span><small>BASESCOUT / TOKENIZED STOCK RESEARCH</small></div>
           {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className={`stock-exhibit stock-exhibit-${i % 3}`} style={{left:a.x - 380, top:a.y - 225}}>
             <small>{String(i+1).padStart(2,"0")} — BASE / B20</small><strong>{a.symbol.replace(/c$/,"")}</strong><div><span>{a.name}</span><span>Open report ↗</span></div>
@@ -168,7 +171,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     </div>
     <header className="stock-hud stock-docs-header">
       <div className="stock-docs-top">
-        <a href="/" className="stocks-brand"><span className="stock-uploaded-logo"><img src="/basescout-bull.png" alt="" /></span><span className="stocks-brand-name">BaseScout</span></a>
+        <a href="/" className="stocks-brand"><span className="stock-uploaded-logo"><img src="/basescout-logo-v2.webp" alt="" /></span><span className="stocks-brand-name">BaseScout</span></a>
         <div className="stock-docs-actions">
           <nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending</a><a href="/basepaint">BasePaint</a></nav>
           <button className="stock-directory-button" ref={indexButton} onClick={() => setIndexOpen(true)}>Stocks <ArrowUpRight size={15} aria-hidden="true" /></button>
@@ -179,14 +182,14 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
     {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
-      <header><span>{exhibits.length} assets</span><button onClick={() => {setIndexOpen(false); indexButton.current?.focus();}}>Close ×</button></header>
+      <header><span>{exhibits.length} assets</span><button onClick={() => {setIndexOpen(false); indexButton.current?.focus();}}>Close</button></header>
       <input ref={indexInput} aria-label="Search stocks" placeholder="Company or ticker" value={query} onChange={e => setQuery(e.target.value)} />
       {!exhibits.some(a => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())) && <p role="status">No matching stocks. Try a company name or ticker.</p>}
       <div className="stock-index-list">{exhibits.map((a,i) => ({a,i})).filter(({a}) => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())).map(({a,i}) => <div className="stock-index-row" key={a.address}><button onClick={() => fly(i)}><small>{String(i+1).padStart(2,"0")}</small><span>{a.name}<small>{a.symbol} / Fly to asset</small></span></button><button aria-label={`Open ${a.name} report`} onClick={() => {setIndexOpen(false);setSelected(i);}}>↗</button></div>)}</div>
       <p>Explore the canvas, or open a report directly.</p>
     </aside>}
     <dialog ref={dialog} aria-label="Stock research report" className="stock-report-dialog" onCancel={() => setSelected(null)} onClose={() => {setSelected(null);indexButton.current?.focus();}}>
-      {selected !== null && <><header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><a href={stockPath(exhibits[selected].address)}>Full report ↗</a><button onClick={() => setSelected(null)}>Close ×</button></div></header>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} /></>}
+      {selected !== null && <><header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><button onClick={() => setSelected(null)}>Close</button></div></header>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} /></>}
     </dialog>
   </main>;
 }
