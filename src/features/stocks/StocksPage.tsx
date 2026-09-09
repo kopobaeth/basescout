@@ -25,7 +25,6 @@ import {
 } from "../../theme";
 import { trackEvent } from "../../analytics";
 import "./stocks.css";
-import "./stocks-gallery.css";
 import StocksCanvas from "./StocksCanvas";
 const SAVE_KEY = "basescout.stocks.saved";
 function readSaved(): string[] {
@@ -232,7 +231,7 @@ export function StocksPage() {
         .includes(query.trim().toLowerCase()),
   );
   const stale = snapshot && now - snapshot.fetchedAt > 120000;
-  if (!selected && !invalidRoute) return <StocksCanvas />;
+  if (!selected && !invalidRoute) return <StocksCanvas theme={theme} onThemeChange={setTheme} />;
   return (
     <main className={`stocks-page ${new URLSearchParams(location.search).has("embed") ? "stocks-embedded" : ""}`}>
       <header className="stocks-nav">

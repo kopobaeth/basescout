@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { STOCKS, stockPath } from "./catalog";
+import type { ThemePreference } from "../../theme";
 import "./stocks-canvas.css";
+import "./stocks-brand.css";
 
 const W = 6000, H = 4200;
 const exhibits = STOCKS.map((stock, i) => ({ ...stock, x: 750 + i % 4 * 1450, y: 620 + Math.floor(i / 4) * 1050 }));
 const wrap = (n: number, size: number) => ((n % size) + size) % size;
 type Point = { x: number; y: number };
 
-export default function StocksCanvas() {
+export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePreference; onThemeChange: (theme: ThemePreference) => void }) {
   const stage = useRef<HTMLDivElement>(null);
   const world = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLCanvasElement>(null);
@@ -110,7 +112,7 @@ export default function StocksCanvas() {
       if (ctx) {
         ctx.clearRect(0, 0, 180, 126); ctx.fillStyle = "#a0a0a6";
         exhibits.forEach(a => ctx.fillRect(a.x / W * 180 - 2, a.y / H * 126 - 2, 4, 4));
-        ctx.strokeStyle = "#e4ff4f";
+        ctx.strokeStyle = "#0052ff";
         for (const x of [-W, 0, W]) for (const y of [-H, 0, H]) ctx.strokeRect((c.x + x - el.clientWidth / c.z / 2) / W * 180, (c.y + y - el.clientHeight / c.z / 2) / H * 126, el.clientWidth / c.z / W * 180, el.clientHeight / c.z / H * 126);
       }
       frame = requestAnimationFrame(draw);
@@ -124,6 +126,10 @@ export default function StocksCanvas() {
     <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Use Index for an accessible asset list.">
       <div ref={world} className="stock-world">
         {[-1,0,1].flatMap(rx => [-1,0,1].map(ry => <div key={`${rx}-${ry}`} className="stock-world-tile" style={{left: rx * W, top: ry * H}} aria-hidden="true">
+          <div className="stock-money stock-money-coin stock-money-one"><span>$</span></div>
+          <div className="stock-money stock-money-note"><span>$</span></div>
+          <div className="stock-money stock-money-coin stock-money-two"><span>◈</span></div>
+          <div className="stock-money stock-money-coin stock-money-three"><span>$</span></div>
           <div className="stock-world-title">EQUITIES.<br /><span>WITHOUT WALLS.</span><small>BASESCOUT / TOKENIZED STOCK RESEARCH</small></div>
           {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className={`stock-exhibit stock-exhibit-${i % 3}`} style={{left:a.x - 380, top:a.y - 225}}>
             <small>{String(i+1).padStart(2,"0")} — BASE / B20</small><strong>{a.symbol.replace(/c$/,"")}</strong><div><span>{a.name}</span><span>Open report ↗</span></div>
@@ -131,7 +137,7 @@ export default function StocksCanvas() {
         </div>))}
       </div>
     </div>
-    <header className="stock-hud"><a href="/" className="stocks-brand"><img src="/basescout.svg" alt="" /><span className="stocks-brand-name">BaseScout</span></a><span className="stock-hud-label">Infinite stocks — Vol.01</span><button ref={indexButton} onClick={() => setIndexOpen(true)}>Index / 13 ≡</button></header>
+    <header className="stock-hud"><a href="/" className="stocks-brand"><img src="/basescout.svg" alt="" /><span className="stocks-brand-name">BaseScout</span></a><span className="stock-hud-label">Stocks</span><nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending</a><a href="/basepaint">BasePaint</a><a href="/stocks" aria-current="page">Stocks</a></nav><select aria-label="Appearance" value={theme} onChange={e => onThemeChange(e.target.value as ThemePreference)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select><button ref={indexButton} onClick={() => setIndexOpen(true)}>Index / 13 ≡</button></header>
     {!touched && <p className="stock-drift-hint">Drag to drift · Scroll or pinch to dive</p>}
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
     {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
