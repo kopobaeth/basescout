@@ -236,9 +236,8 @@ export function StocksPage() {
     <main className={`stocks-page ${new URLSearchParams(location.search).has("embed") ? "stocks-embedded" : ""}`}>
       <header className="stocks-nav">
         <a href="/" className="stocks-brand">
-          <img src="/basescout.svg" alt="" />
+          <span className="stock-uploaded-logo"><img src="/basescout-bull.png" alt="" /></span>
           <span className="stocks-brand-name">BaseScout</span>
-          <span className="stocks-brand-section">Stocks</span>
         </a>
         <nav aria-label="Research navigation">
           <a href="/">Token scanner</a>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Moon, Sun, ArrowUpRight } from "lucide-react";
 import { STOCKS, stockPath } from "./catalog";
 import type { ThemePreference } from "../../theme";
 import "./stocks-canvas.css";
@@ -25,6 +26,14 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const [selected, setSelected] = useState<number | null>(null);
   const [touched, setTouched] = useState(false);
   const [reportReady, setReportReady] = useState(false);
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark = theme === "dark" || (theme === "system" && systemDark);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemDark(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const blocked = useRef(false);
   blocked.current = indexOpen || selected !== null;
   const fly = (i: number) => {
@@ -156,7 +165,16 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
         </div>))}
       </div>
     </div>
-    <header className="stock-hud"><a href="/" className="stocks-brand"><img src="/basescout.svg" alt="" /><span className="stocks-brand-name">BaseScout</span></a><span className="stock-hud-label">Stocks</span><nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending</a><a href="/basepaint">BasePaint</a><a href="/stocks" aria-current="page">Stocks</a></nav><select aria-label="Appearance" value={theme} onChange={e => onThemeChange(e.target.value as ThemePreference)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select><button ref={indexButton} onClick={() => setIndexOpen(true)}>Index / 13 ≡</button></header>
+    <header className="stock-hud stock-docs-header">
+      <div className="stock-docs-top">
+        <a href="/" className="stocks-brand"><span className="stock-uploaded-logo"><img src="/basescout-bull.png" alt="" /></span><span className="stocks-brand-name">BaseScout</span></a>
+        <div className="stock-docs-actions">
+          <button className="stock-directory-button" ref={indexButton} onClick={() => setIndexOpen(true)}>Stocks <ArrowUpRight size={15} aria-hidden="true" /></button>
+          <button className="stock-theme-button" aria-label={`Switch to ${isDark ? "light" : "dark"} theme`} title={`Switch to ${isDark ? "light" : "dark"} theme`} onClick={() => onThemeChange(isDark ? "light" : "dark")}>{isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}</button>
+        </div>
+      </div>
+      <nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending</a><a href="/basepaint">BasePaint</a><a href="/stocks" aria-current="page">Stocks</a></nav>
+    </header>
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
     <div className="stock-camera-tools" role="group" aria-label="Canvas controls"><button aria-label="Zoom out" onClick={() => zoomControl.current(.8)}>−</button><button aria-label="Zoom in" onClick={() => zoomControl.current(1.25)}>+</button><button onClick={() => fly(0)}>Reset view</button></div>
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>

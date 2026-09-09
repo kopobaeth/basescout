@@ -70,3 +70,21 @@
 @media(max-width:650px) { .stock-camera-tools { right:12px;bottom:22px; } .stock-drift-hint { bottom:106px;max-width:calc(100% - 28px);text-align:center; } .stock-hud-bottom { max-width:50%; } }
 @media(max-width:1050px) { .stock-hud { flex-wrap:wrap; padding:14px 20px;gap:12px; } .stock-hud nav { order:5;width:100%;justify-content:center;gap:22px; } .stock-hud>select { margin-left:auto; } }
 @media(max-width:650px) { .stock-hud-label { display:none; } .stock-hud { padding:12px; } .stock-hud nav { font-size:11px;gap:20px; } .stock-report-dialog { border-radius:0; } }
+
+/* Base Docs hierarchy: brand/actions row, followed by understated section tabs. */
+.stock-hud.stock-docs-header { display:block; padding:0 38px; background:var(--surface-base); backdrop-filter:none; }
+.stock-docs-top { display:flex; align-items:center; justify-content:space-between; gap:20px; min-height:62px; }
+.stock-docs-actions { display:flex; align-items:center; gap:10px; pointer-events:auto; }
+.stock-docs-header .stocks-brand { gap:10px; font-size:22px; }
+.stock-uploaded-logo { position:relative; display:block; width:34px; height:34px; flex:0 0 34px; overflow:hidden; border-radius:7px; }
+.stocks-brand .stock-uploaded-logo img { position:absolute; width:46px; height:46px; max-width:none; left:-6px; top:-5.5px; border-radius:0; box-shadow:none; }
+.stock-docs-header .stock-directory-button { border:0; border-radius:999px; min-height:36px; padding:8px 15px; color:white; background:#0000ff; gap:7px; }
+.stock-docs-header .stock-directory-button:hover { background:#2424ff; }
+.stock-docs-header .stock-theme-button { display:grid; place-items:center; width:36px; min-height:36px; padding:0; border:0; border-radius:50%; color:var(--muted); background:transparent; }
+.stock-docs-header .stock-theme-button:hover { background:var(--surface-hover); color:var(--ink); }
+.stock-hud.stock-docs-header nav { display:flex; margin:0; width:auto; justify-content:flex-start; gap:26px; min-height:40px; font-size:13px; overflow-x:auto; scrollbar-width:none; }
+.stock-docs-header nav a { position:relative; display:flex; align-items:center; padding:10px 0 13px; white-space:nowrap; font-weight:400; color:var(--muted); }
+.stock-docs-header nav a:hover { color:var(--ink); }
+.stock-docs-header nav a[aria-current] { color:var(--ink); font-weight:600; }
+.stock-docs-header nav a[aria-current]::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; background:#0000ff; }
+@media(max-width:650px) { .stock-hud.stock-docs-header { padding:0 16px; } .stock-docs-top { min-height:58px; } .stock-docs-header .stocks-brand { font-size:20px; } .stock-hud.stock-docs-header nav { gap:23px; font-size:12px; } }
