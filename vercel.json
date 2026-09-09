@@ -19,6 +19,14 @@
     {
       "source": "/token/:address",
       "destination": "/index.html"
+    },
+    {
+      "source": "/stocks",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/stocks/:path*",
+      "destination": "/index.html"
     }
   ]
 }

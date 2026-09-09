@@ -1,3 +1,4 @@
+import { findStock, stockPath } from "./features/stocks/catalog";
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
@@ -95,6 +96,8 @@ declare global {
     __basescoutRoot?: Root;
   }
 }
+
+const StocksPage = React.lazy(() => import("./features/stocks/StocksPage").then(m => ({ default: m.StocksPage })));
 
 const BasePaintPage = React.lazy(() =>
   import("./features/basepaint/BasePaintPage").then((module) => ({ default: module.BasePaintPage }))
@@ -362,6 +365,7 @@ function scanErrorView(code: ScanErrorCode, message?: string): ScanErrorView {
     };
   }
 
+  if (code === "unsupported_asset") return { code, title: "B20 stock research", message: message ?? "Open Stocks for this asset. Generic ERC-20 scoring is not supported." };
   if (code === "partial_contract_intelligence_failure") {
     return {
       code,
@@ -560,6 +564,7 @@ function isBasePaintPath(pathname = window.location.pathname) {
 }
 
 function App() {
+  if (window.location.pathname === "/stocks" || window.location.pathname.startsWith("/stocks/")) return <React.Suspense fallback={<main className="route-loading">Loading stock research…</main>}><StocksPage /></React.Suspense>;
   return isBasePaintPath() ? (
     <React.Suspense
       fallback={
@@ -796,6 +801,8 @@ function ScoutApp() {
 
   async function scanToken(rawAddress: string, context: ScanContext = { source: "manual" }) {
     const tokenAddress = rawAddress.trim();
+    const stock = findStock(tokenAddress);
+    if (stock) { window.location.assign(stockPath(stock.address)); return; }
     const scanEventProperties = {
       source: context.source,
       ...tokenAnalyticsProperties(tokenAddress, context.symbol)
@@ -1127,6 +1134,7 @@ function ScoutApp() {
               <Activity size={17} />
               <span>Trending pools</span>
             </a>
+            <a className="sidebar-link" href="/stocks" title="Tokenized stocks"><WalletCards size={17}/><span>Stocks</span></a>
           </div>
 
           <div className="sidebar-group">

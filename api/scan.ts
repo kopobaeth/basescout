@@ -1,3 +1,19 @@
+// Keep the self-contained scan endpoint in sync with the reviewed stock catalog.
+export const STOCK_ADDRESSES = new Set([
+  "0xb200000000000000000000c2e324d24d7eecd1fb",
+  "0xb200000000000000000000d9192b6b456483c2e8",
+  "0xb200000000000000000000c85a31389d71f3ecfb",
+  "0xb20000000000000000000019f6e7c675b73c2e4d",
+  "0xb2000000000000000000002d0ba3164cc74f58b7",
+  "0xb2000000000000000000004aff16039ba04bdfbc",
+  "0xb2000000000000000000008bc8786b856e61707c",
+  "0xb200000000000000000000ab99cfa739e253872b",
+  "0xb2000000000000000000004884b426556b92883d",
+  "0xb20000000000000000000078ee7ce2fe4908108c",
+  "0xb200000000000000000000397293cb8cda9a10c5",
+  "0xb2000000000000000000007b9fcbd005511acbd5",
+  "0xb2000000000000000000001e800a7f5189430cd0",
+]);
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
@@ -106,6 +122,7 @@ export type BaseScanIntelligence = {
 };
 
 export type ScanErrorCode =
+  | "unsupported_asset"
   | "invalid_address"
   | "no_base_pair"
   | "api_timeout"
@@ -1839,6 +1856,15 @@ export async function scanTokenData(rawAddress: string, now = Date.now()): Promi
     };
   }
 
+  if (STOCK_ADDRESSES.has(address)) {
+    return { status: 422, payload: {
+      address, pair: null, pairs: [],
+      baseScan: emptyBaseScanIntelligence("unavailable", "no-data"),
+      security: emptySecurityIntelligence("B20 assets require a separate research model."),
+      error: `B20 stock: use /stocks/${address} for stock research. Generic ERC-20 scoring is not supported.`,
+      errorCode: "unsupported_asset"
+    } };
+  }
   const deadlineAt = now + SCAN_DEADLINE_MS;
   const [dexResult, baseScanResult, securityResult] = await Promise.allSettled([
     fetchDexPairs(address, deadlineAt),

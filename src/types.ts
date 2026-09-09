@@ -155,6 +155,7 @@ export type ScanResult = {
 };
 
 export type ScanErrorCode =
+  | "unsupported_asset"
   | "invalid_address"
   | "no_base_pair"
   | "api_timeout"

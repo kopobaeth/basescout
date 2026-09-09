@@ -1,6 +1,9 @@
 import posthog from "posthog-js";
 
 type AnalyticsEventName =
+  | "stocks_opened"
+  | "stock_report_opened"
+  | "stock_saved_changed"
   | "basepaint_collect_connected"
   | "basepaint_collect_failed"
   | "basepaint_collect_reviewed"

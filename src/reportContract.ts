@@ -40,6 +40,7 @@ const REPORT_ERROR_CODES: ReportErrorCode[] = [
   "api_timeout",
   "rate_limit",
   "partial_contract_intelligence_failure",
+  "unsupported_asset",
   "unexpected_server_error",
   "method_not_allowed"
 ];

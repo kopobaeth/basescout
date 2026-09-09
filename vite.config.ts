@@ -1,3 +1,4 @@
+import stocksHandler from "./api/stocks";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import basePaintActivityHandler from "./api/basepaint-activity";
@@ -15,6 +16,7 @@ export default defineConfig({
       configureServer(server) {
         server.middlewares.use((request, response, next) => {
           const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+          if (pathname === "/api/stocks") { void stocksHandler(request, response); return; }
           if (pathname === "/api/scan") {
             void scanHandler(request, response);
             return;
