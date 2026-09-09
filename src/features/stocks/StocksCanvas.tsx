@@ -140,7 +140,7 @@ export default function StocksCanvas() {
       <div className="stock-index-list">{exhibits.map((a,i) => ({a,i})).filter(({a}) => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())).map(({a,i}) => <div className="stock-index-row" key={a.address}><button onClick={() => fly(i)}><small>{String(i+1).padStart(2,"0")}</small><span>{a.name}<small>{a.symbol} / Fly to asset</small></span></button><button aria-label={`Open ${a.name} report`} onClick={() => {setIndexOpen(false);setSelected(i);}}>↗</button></div>)}</div>
       <p>Explore the canvas, or open a report directly.</p>
     </aside>}
-    <dialog ref={dialog} className="stock-report-dialog" onCancel={() => setSelected(null)} onClose={() => {setSelected(null);indexButton.current?.focus();}}>
+    <dialog ref={dialog} aria-label="Stock research report" className="stock-report-dialog" onCancel={() => setSelected(null)} onClose={() => {setSelected(null);indexButton.current?.focus();}}>
       {selected !== null && <><header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><a href={stockPath(exhibits[selected].address)}>Full report ↗</a><button onClick={() => setSelected(null)}>Close ×</button></div></header><iframe key={selected} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} /></>}
     </dialog>
   </main>;

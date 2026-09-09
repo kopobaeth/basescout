@@ -323,7 +323,7 @@ export function StocksPage() {
                     <Bookmark size={15} />
                     {saved.includes(selected.address) ? "Unsave" : "Save asset"}
                   </button>
-                  <button onClick={() => void copy(location.href)}>
+                  <button onClick={() => void copy(`${location.origin}${stockPath(selected.address)}`)}>
                     Copy report link
                   </button>
                 </div>

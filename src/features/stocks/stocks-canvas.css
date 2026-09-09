@@ -1,3 +1,4 @@
+.stocks-embedded .stocks-back{display:none}
 .stock-universe{position:fixed;inset:0;overflow:hidden;background:#060607!important;color:#ececec!important;--ink:#ececec;--muted:#a0a0a6;--line:#35353b;--surface-raised:#101012;--base-blue:#e4ff4f}
 .stock-stage{position:absolute;inset:0;touch-action:none;cursor:grab;overflow:hidden;background:radial-gradient(ellipse at center,#16161d 0,#060607 80%)}
 .stock-stage:active{cursor:grabbing}.stock-stage:focus-visible{outline:1px solid #e4ff4f;outline-offset:-4px}
