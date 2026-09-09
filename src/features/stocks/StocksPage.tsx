@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
   Bookmark,
+  CheckCircle2,
   Copy,
   Search,
   RefreshCw,
@@ -45,6 +46,78 @@ const money = (n?: number) =>
         currency: "USD",
         maximumFractionDigits: n < 1 ? 6 : 2,
       }).format(n);
+
+const STOCK_LOGOS: Record<
+  string,
+  { color: string; path?: string; label?: string; tiles?: boolean }
+> = {
+  AAPLc: {
+    color: "#8e99a8",
+    path: "M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701",
+  },
+  AMZNc: { color: "#ff9900", label: "a" },
+  COINc: { color: "#1652f0", label: "C" },
+  CRCLc: {
+    color: "#00d395",
+    path: "M20.788 3.832A11.903 11.903 0 0 0 12 0a12 12 0 1 0 8.788 3.832ZM12 4.589A7.411 7.411 0 1 1 4.589 12 7.42 7.42 0 0 1 12 4.589Zm0 1.75A5.661 5.661 0 1 0 17.661 12 5.667 5.667 0 0 0 12 6.339Z",
+  },
+  GOOGLc: {
+    color: "#4285f4",
+    path: "M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z",
+  },
+  INTCc: { color: "#00c7fd", label: "intel" },
+  METAc: {
+    color: "#0866ff",
+    path: "M6.915 4.03C2.724 4.03 0 9.695 0 14.449c0 3.323 1.305 5.521 4.439 5.521 2.799 0 4.073-2.351 6.628-6.764l.942-1.664c.061.1.121.196.183.3l2.152 3.595c1.878 3.139 3.312 4.534 5.53 4.534C22.456 19.971 24 18.128 24 14.41c0-5.254-2.746-10.38-6.8-10.38-2.156 0-3.937 1.836-5.853 4.358-1.952-2.477-3.103-4.358-4.432-4.358Zm.041 2.606c1.265 0 2.375 1.326 3.827 3.026-1.734 2.662-3.634 6.72-5.057 7.536-1.518.87-3.133-.135-3.133-2.656 0-3.62 1.716-7.906 4.363-7.906Zm10.12-.553c2.517 0 4.638 4.039 4.638 8.399 0 2.016-.624 2.9-1.839 2.9-1.279 0-2.312-1.827-5.113-6.39 1.574-2.486 2.618-4.909 4.314-4.909Z",
+  },
+  MSFTc: { color: "#00a4ef", tiles: true },
+  MSTRc: { color: "#ff3b30", label: "M" },
+  NVDAc: {
+    color: "#76b900",
+    path: "M8.948 8.798v-1.43c4.243-.251 6.917 3.356 6.917 3.356s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952c-.273 0-.54.012-.796.035Zm0-4.735v2.138C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936s2.164-3.197 6.492-3.533V4.063Zm0 15.874H24V4.063H8.948v2.138c5.876-.406 9.434 4.443 9.434 4.443s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097l-.009 4.426Z",
+  },
+  SNDKc: { color: "#ed1c24", label: "S" },
+  SPCXc: {
+    color: "#8b9bb4",
+    path: "M24 7.417C8.882 8.287 1.89 14.75.321 16.28L0 16.583h2.797C10.356 9.005 21.222 7.663 24 7.417Zm-17.046 6.35c-.472.321-.945.68-1.398 1.02l2.457 1.796h2.778zM2.948 10.8H.189l3.25 2.381c.473-.321 1.02-.661 1.512-.945Z",
+  },
+  TSLAc: {
+    color: "#e82127",
+    path: "M12 5.362 14.475 2.336s4.245.09 8.471 2.054c-1.082 1.636-3.231 2.438-3.231 2.438-.146-1.439-1.154-1.79-4.354-1.79L12 24 8.619 5.034c-3.18 0-4.188.354-4.335 1.792 0 0-2.146-.795-3.229-2.43C5.28 2.431 9.525 2.34 9.525 2.34L12 5.362ZM12 1.463c3.415-.03 7.326.528 11.328 2.28.535-.968.672-1.395.672-1.395C19.625.612 15.528.015 12 0 8.472.015 4.375.61 0 2.349c0 0 .195.525.672 1.396C4.674 1.989 8.585 1.435 12 1.46Z",
+  },
+};
+
+function StockLogo({
+  symbol,
+  large = false,
+}: {
+  symbol: string;
+  large?: boolean;
+}) {
+  const logo = STOCK_LOGOS[symbol] ?? {
+    color: "#0052ff",
+    label: symbol.slice(0, 2),
+  };
+  return (
+    <span
+      className={`stock-logo${large ? " stock-logo-large" : ""}`}
+      style={{ "--stock-color": logo.color } as CSSProperties}
+      aria-hidden="true"
+    >
+      {logo.tiles ? (
+        <svg viewBox="0 0 24 24">
+          <path d="M2 2h9v9H2V2Zm11 0h9v9h-9V2ZM2 13h9v9H2v-9Zm11 0h9v9h-9v-9Z" />
+        </svg>
+      ) : logo.path ? (
+        <svg viewBox="0 0 24 24">
+          <path d={logo.path} />
+        </svg>
+      ) : (
+        <strong>{logo.label}</strong>
+      )}
+    </span>
+  );
+}
 export function StocksPage() {
   const route = window.location.pathname.split("/").filter(Boolean);
   const selected = route.length === 2 ? findStock(route[1]) : undefined;
@@ -161,7 +234,9 @@ export function StocksPage() {
     <main className="stocks-page">
       <header className="stocks-nav">
         <a href="/" className="stocks-brand">
-          BaseScout<span> / Stocks</span>
+          <img src="/basescout.svg" alt="" />
+          <span className="stocks-brand-name">BaseScout</span>
+          <span className="stocks-brand-section">Stocks</span>
         </a>
         <nav aria-label="Research navigation">
           <a href="/">Token scanner</a>
@@ -185,7 +260,8 @@ export function StocksPage() {
           <span /> BASE EQUITY RESEARCH
         </div>
         <section className="stocks-hero">
-          <div>
+          {selected && <StockLogo symbol={selected.symbol} large />}
+          <div className="stocks-hero-copy">
             <h1>{selected ? selected.name : "Stocks, with context."}</h1>
             <p>
               {selected
@@ -193,11 +269,13 @@ export function StocksPage() {
                 : "Explore tokenized equities. Check the address, understand the mechanics, and see what the data covers."}
             </p>
           </div>
-          <div className="stocks-count">
-            <Layers size={24} />
-            <strong>{STOCKS.length}</strong>
-            <span>Listed assets</span>
-          </div>
+          {!selected && (
+            <div className="stocks-count">
+              <Layers size={24} />
+              <strong>{STOCKS.length}</strong>
+              <span>Listed assets</span>
+            </div>
+          )}
         </section>
         <p className="stocks-disclosure">
           Research only. Coinbase tokenized stocks are available only to
@@ -228,10 +306,10 @@ export function StocksPage() {
                   <ShieldCheck size={22} />
                 </div>
                 <p className="stocks-badge">
-                  Address matches the official list
+                  <CheckCircle2 size={14} /> Official address match
                 </p>
                 <p className="stocks-address">{selected.address}</p>
-                <div className="stocks-actions">
+                <div className="stocks-actions stocks-action-buttons">
                   <button onClick={() => void copy(selected.address)}>
                     <Copy size={15} /> Copy address
                   </button>
@@ -265,22 +343,13 @@ export function StocksPage() {
                   safety or your ability to trade.
                 </p>
                 <div className="stocks-actions">
-                  <a href={STOCK_SOURCE} target="_blank" rel="noreferrer">
-                    Official token list <ArrowUpRight size={15} />
-                  </a>
                   <a
+                    className="stocks-button stocks-button-primary"
                     href={`https://basescan.org/token/${selected.address}`}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Explorer <ArrowUpRight size={15} />
-                  </a>
-                  <a
-                    href="https://www.coinbase.com/tokenize"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Issuer information <ArrowUpRight size={15} />
+                    View on BaseScan <ArrowUpRight size={15} />
                   </a>
                 </div>
               </section>
@@ -345,6 +414,16 @@ export function StocksPage() {
                         : ""}
                       Retrieved {new Date(snapshot.fetchedAt).toLocaleString()}.
                     </p>
+                    {snapshot.market.pairAddress && (
+                      <a
+                        className="stocks-button stocks-button-primary stocks-market-link"
+                        href={`https://dexscreener.com/base/${snapshot.market.pairAddress}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open market on DEX Screener <ArrowUpRight size={15} />
+                      </a>
+                    )}
                   </>
                 ) : null}
               </section>
@@ -407,9 +486,7 @@ export function StocksPage() {
                   key={stock.address}
                 >
                   <div className="stocks-card-top">
-                    <span className="stocks-monogram">
-                      {stock.symbol.slice(0, 2)}
-                    </span>
+                    <StockLogo symbol={stock.symbol} />
                     <button
                       aria-label={`${saved.includes(stock.address) ? "Unsave" : "Save"} ${stock.symbol}`}
                       aria-pressed={saved.includes(stock.address)}
@@ -453,9 +530,18 @@ export function StocksPage() {
             Official-list snapshot checked {CATALOG_CHECKED}. Names and symbols
             may change.
           </p>
-          <a href={STOCK_SOURCE} target="_blank" rel="noreferrer">
-            Source: Base documentation ↗
-          </a>
+          <div>
+            <a href={STOCK_SOURCE} target="_blank" rel="noreferrer">
+              Official B20 source <ArrowUpRight size={13} />
+            </a>
+            <a
+              href="https://www.coinbase.com/tokenize"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Coinbase product &amp; eligibility <ArrowUpRight size={13} />
+            </a>
+          </div>
         </footer>
       </div>
     </main>
