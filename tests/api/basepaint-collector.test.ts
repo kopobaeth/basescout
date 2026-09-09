@@ -3,7 +3,7 @@ import {
   cacheControlForBasePaintCollectorStatus,
   checksummedCollectorAddress,
   clearBasePaintCollectorCacheForTests
-} from "./basepaint-collector";
+} from "../../api/basepaint-collector";
 
 assert.match(cacheControlForBasePaintCollectorStatus(200), /s-maxage=60/);
 assert.match(cacheControlForBasePaintCollectorStatus(200), /stale-while-revalidate=300/);

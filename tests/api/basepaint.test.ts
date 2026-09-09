@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cacheControlForBasePaintStatus, clearBasePaintCacheForTests } from "./basepaint";
+import { cacheControlForBasePaintStatus, clearBasePaintCacheForTests } from "../../api/basepaint";
 
 assert.match(cacheControlForBasePaintStatus(200), /s-maxage=60/);
 assert.match(cacheControlForBasePaintStatus(200), /stale-while-revalidate=300/);
