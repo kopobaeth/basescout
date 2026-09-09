@@ -18,7 +18,6 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const dialog = useRef<HTMLDialogElement>(null);
   const indexInput = useRef<HTMLInputElement>(null);
   const indexButton = useRef<HTMLButtonElement>(null);
-  const zoomControl = useRef<(factor: number) => void>(() => {});
   const userInteracted = useRef(false);
   const cam = useRef({ x: 2900, y: 1800, z: .48, tx: 2900, ty: 1800, tz: .48, vx: 0, vy: 0 });
   const [indexOpen, setIndexOpen] = useState(false);
@@ -66,7 +65,6 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       c.ty += (y - el.clientHeight / 2) * (1 / c.tz - 1 / z);
       c.tz = z; c.vx = c.vy = 0;
     };
-    zoomControl.current = factor => { userInteracted.current = true; setTouched(true); zoom(el.clientWidth / 2, el.clientHeight / 2, factor); };
     // Start with the first pair of assets; a short dolly settles before interaction.
     const c = cam.current;
     c.x = c.tx = 1475; c.y = c.ty = 900;
@@ -147,7 +145,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     };
     el.addEventListener("pointerdown", down); el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("wheel", wheel, { passive: false }); el.addEventListener("keydown", keys);
     frame = requestAnimationFrame(draw);
-    return () => { clearTimeout(intro); cancelAnimationFrame(frame); zoomControl.current = () => {}; el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", keys); };
+    return () => { clearTimeout(intro); cancelAnimationFrame(frame); el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", keys); };
   }, []);
 
   return <main className="stocks-page stock-universe">
@@ -172,17 +170,16 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       <div className="stock-docs-top">
         <a href="/" className="stocks-brand"><span className="stock-uploaded-logo"><img src="/basescout-bull.png" alt="" /></span><span className="stocks-brand-name">BaseScout</span></a>
         <div className="stock-docs-actions">
+          <nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending</a><a href="/basepaint">BasePaint</a></nav>
           <button className="stock-directory-button" ref={indexButton} onClick={() => setIndexOpen(true)}>Stocks <ArrowUpRight size={15} aria-hidden="true" /></button>
           <button className="stock-theme-button" aria-label={`Switch to ${isDark ? "light" : "dark"} theme`} title={`Switch to ${isDark ? "light" : "dark"} theme`} onClick={() => onThemeChange(isDark ? "light" : "dark")}>{isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}</button>
         </div>
       </div>
-      <nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending</a><a href="/basepaint">BasePaint</a><a href="/stocks" aria-current="page">Stocks</a></nav>
     </header>
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
-    <div className="stock-camera-tools" role="group" aria-label="Canvas controls"><button aria-label="Zoom out" onClick={() => zoomControl.current(.8)}>−</button><button aria-label="Zoom in" onClick={() => zoomControl.current(1.25)}>+</button><button onClick={() => fly(0)}>Reset view</button></div>
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
     {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
-      <header><span>Index / {exhibits.length} assets</span><button onClick={() => {setIndexOpen(false); indexButton.current?.focus();}}>Close ×</button></header>
+      <header><span>{exhibits.length} assets</span><button onClick={() => {setIndexOpen(false); indexButton.current?.focus();}}>Close ×</button></header>
       <input ref={indexInput} aria-label="Search stocks" placeholder="Company or ticker" value={query} onChange={e => setQuery(e.target.value)} />
       {!exhibits.some(a => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())) && <p role="status">No matching stocks. Try a company name or ticker.</p>}
       <div className="stock-index-list">{exhibits.map((a,i) => ({a,i})).filter(({a}) => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())).map(({a,i}) => <div className="stock-index-row" key={a.address}><button onClick={() => fly(i)}><small>{String(i+1).padStart(2,"0")}</small><span>{a.name}<small>{a.symbol} / Fly to asset</small></span></button><button aria-label={`Open ${a.name} report`} onClick={() => {setIndexOpen(false);setSelected(i);}}>↗</button></div>)}</div>
