@@ -25,6 +25,7 @@ import {
 } from "../../theme";
 import { trackEvent } from "../../analytics";
 import "./stocks.css";
+import "./stocks-gallery.css";
 const SAVE_KEY = "basescout.stocks.saved";
 function readSaved(): string[] {
   try {
@@ -262,7 +263,7 @@ export function StocksPage() {
         <section className="stocks-hero">
           {selected && <StockLogo symbol={selected.symbol} large />}
           <div className="stocks-hero-copy">
-            <h1>{selected ? selected.name : "Stocks, with context."}</h1>
+            <h1>{selected ? selected.name : <>Equities.<br /><span className="stocks-outline">Onchain.</span></>}</h1>
             <p>
               {selected
                 ? `${selected.symbol} · Coinbase-issued tokenized equity on Base`
@@ -271,7 +272,7 @@ export function StocksPage() {
           </div>
           {!selected && (
             <div className="stocks-count">
-              <Layers size={24} />
+              <Layers size={24} aria-hidden="true" />
               <strong>{STOCKS.length}</strong>
               <span>Listed assets</span>
             </div>
@@ -479,12 +480,14 @@ export function StocksPage() {
                 {onlySaved ? "Show all stocks" : `Saved (${saved.length})`}
               </button>
             </div>
+            <div className="stocks-index-heading"><span>Asset index</span><span>{String(filtered.length).padStart(2, "0")} / {String(STOCKS.length).padStart(2, "0")} assets</span></div>
             <div className="stocks-grid">
               {filtered.map((stock) => (
                 <article
                   className="stocks-panel stocks-card"
                   key={stock.address}
                 >
+                  <div className="stocks-card-art" aria-hidden="true"><span>{stock.symbol.replace(/c$/, "")}</span><small>{String(STOCKS.indexOf(stock) + 1).padStart(2, "0")} / BASE</small></div>
                   <div className="stocks-card-top">
                     <StockLogo symbol={stock.symbol} />
                     <button
