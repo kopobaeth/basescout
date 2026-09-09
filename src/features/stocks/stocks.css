@@ -356,3 +356,8 @@
     letter-spacing: -1px;
   }
 }
+
+.stocks-page a { color: inherit; text-decoration: none; }
+.stocks-page a:hover { color: var(--vantage-accent); }
+.stocks-page a:focus-visible, .stocks-page button:focus-visible, .stocks-page select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
+.stocks-page .stocks-card-link, .stocks-page .stocks-actions a, .stocks-page .stocks-footer a { color: var(--vantage-accent); }
