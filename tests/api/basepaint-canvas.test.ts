@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {
   cacheControlForBasePaintCanvasStatus,
   clearBasePaintCanvasCacheForTests
-} from "./basepaint-canvas";
+} from "../../api/basepaint-canvas";
 
 assert.match(cacheControlForBasePaintCanvasStatus(200), /s-maxage=60/);
 assert.match(cacheControlForBasePaintCanvasStatus(200), /stale-while-revalidate=300/);

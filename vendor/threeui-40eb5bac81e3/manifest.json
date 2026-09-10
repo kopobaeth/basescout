@@ -1,0 +1,7 @@
+{
+  "src/shaders/structure-flow/StructureFlowCollection.tsx": "658c5ade6ab0460a606a2dccedeb85c875f434db57472ca2f512670e7b23f6f6",
+  "src/shaders/structure-flow/StructureFlowBackground.tsx": "d051be3b69d543b4a5b50b114d6e106137d01dc1eed6ce07367000b208f1a743",
+  "src/shaders/structure-flow/structureFlowRenderer.ts": "55abf8a55293fbd3e1a5d3dab1ed02d51e1baf854b8ff86287d8348f51e7ed92",
+  "src/shaders/structure-flow/three128.d.ts": "8324c6614057aee8cde81db247a34bc4d3e5c93cec89c6753874ba94ace5fe71",
+  "src/shaders/threeui.css": "efe4447139f1358dd8e9be68edf6fa46cbefbd1de423a4d6c439ca61d2c8eccf"
+}
