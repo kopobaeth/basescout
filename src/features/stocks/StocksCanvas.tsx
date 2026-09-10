@@ -4,6 +4,8 @@ import { STOCKS, stockPath } from "./catalog";
 import type { ThemePreference } from "../../theme";
 import "./stocks-canvas.css";
 import "./stocks-brand.css";
+import { StructureFlowCollection } from "../../shaders/structure-flow/StructureFlowCollection";
+import "../../shaders/structure-flow/styles.css";
 
 const W = 6000, H = 4200;
 const exhibits = STOCKS.map((stock, i) => ({ ...stock, x: 750 + i % 4 * 1450, y: 620 + Math.floor(i / 4) * 1050 }));
@@ -150,6 +152,9 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
 
   return <main className="stocks-page stock-universe">
     <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Use Index for an accessible asset list.">
+      {isDark && <div className="stock-structure-flow" aria-hidden="true">
+        <StructureFlowCollection variant="structure-flow" speed={1.00} pointSize={0.080} opacity={0.40} maskStart={0.20} maskSolid={0.50} />
+      </div>}
       <div ref={world} className="stock-world">
         {[-1,0,1].flatMap(rx => [-1,0,1].map(ry => <div key={`${rx}-${ry}`} className="stock-world-tile" style={{left: rx * W, top: ry * H}} aria-hidden="true">
           <div className="stock-money stock-money-coin stock-money-one"><span>$</span></div>

@@ -1,4 +1,7 @@
 /* Shared BaseScout typography and theme; striped money motifs from Base references. */
+.stock-structure-flow { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+.stock-structure-flow .threeui-background { background:transparent; }
+.stock-world { z-index:1; }
 .stocks-page, .stocks-page button, .stocks-page select, .stocks-page input,
 .stocks-page h1, .stocks-page h2, .stocks-page h3,
 .stock-universe strong, .stock-universe small, .stock-universe header,
