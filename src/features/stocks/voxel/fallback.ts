@@ -12,9 +12,10 @@ export function renderModelFallback(model: StockModel): HTMLCanvasElement {
   const canvas=document.createElement("canvas");canvas.width=OBJECT_WIDTH;canvas.height=OBJECT_HEIGHT;
   const ctx=canvas.getContext("2d")!;
   // Broad ground shadow plus a tighter contact shadow, separate from object faces.
-  const shadow=ctx.createRadialGradient(420,492,10,420,492,310);
+  ctx.save();ctx.translate(420,515);ctx.scale(1,.26);
+  const shadow=ctx.createRadialGradient(0,0,10,0,0,310);
   shadow.addColorStop(0,"rgba(0,0,0,.65)");shadow.addColorStop(.65,"rgba(0,0,0,.28)");shadow.addColorStop(1,"rgba(0,0,0,0)");
-  ctx.save();ctx.translate(0,205);ctx.scale(1,.58);ctx.fillStyle=shadow;ctx.fillRect(70,180,700,630);ctx.restore();
+  ctx.fillStyle=shadow;ctx.beginPath();ctx.arc(0,0,310,0,Math.PI*2);ctx.fill();ctx.restore();
   const faces:{points:Point[];depth:number;color:string;glow:number}[]=[];
   for(const v of model.voxels) {
     const x=v.x-v.w/2,X=v.x+v.w/2,y=v.y-v.h/2,Y=v.y+v.h/2,z=v.z-v.d/2,Z=v.z+v.d/2;
