@@ -3068,6 +3068,20 @@ body {
   text-align: center;
 }
 
+.sidebar-link .sidebar-new-badge {
+  min-width: auto;
+  padding: 2px 7px;
+  color: #ffffff;
+  background: var(--base-blue);
+  border-color: color-mix(in srgb, var(--base-blue) 78%, #ffffff);
+  box-shadow: 0 3px 12px rgba(0, 82, 255, 0.22);
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .sidebar-link:hover {
   color: var(--vantage-text-primary);
   background: var(--vantage-surface-muted);

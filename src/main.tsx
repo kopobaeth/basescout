@@ -1134,7 +1134,11 @@ function ScoutApp() {
               <Activity size={17} />
               <span>Trending pools</span>
             </a>
-            <a className="sidebar-link" href="/stocks" title="Tokenized stocks"><WalletCards size={17}/><span>Stocks</span></a>
+            <a className="sidebar-link" href="/stocks" title="Tokenized stocks">
+              <WalletCards size={17} />
+              <span>Stocks</span>
+              <b className="sidebar-new-badge">New</b>
+            </a>
           </div>
 
           <div className="sidebar-group">
