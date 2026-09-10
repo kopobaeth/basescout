@@ -6,6 +6,9 @@ import "./stocks-canvas.css";
 import "./stocks-brand.css";
 import { StructureFlowCollection } from "../../shaders/structure-flow/StructureFlowCollection";
 import "../../shaders/structure-flow/styles.css";
+import { VoxelGallery } from "./voxel/VoxelGallery";
+import { OBJECT_WIDTH, OBJECT_HEIGHT } from "./voxel/models";
+import "./voxel/voxel.css";
 
 const W = 6000, H = 4200;
 const exhibits = STOCKS.map((stock, i) => ({ ...stock, x: 750 + i % 4 * 1450, y: 620 + Math.floor(i / 4) * 1050 }));
@@ -27,6 +30,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const [selected, setSelected] = useState<number | null>(null);
   const [touched, setTouched] = useState(false);
   const [reportReady, setReportReady] = useState(false);
+  const [webglReady, setWebglReady] = useState(false);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
   const isDark = theme === "dark" || (theme === "system" && systemDark);
   useEffect(() => {
@@ -42,7 +46,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     const c = cam.current, a = exhibits[i];
     c.tx = c.x + wrap(a.x - c.x + W / 2, W) - W / 2;
     c.ty = c.y + wrap(a.y - c.y + H / 2, H) - H / 2;
-    c.tz = Math.min(1.8, window.innerWidth * .75 / 760, window.innerHeight * .65 / 450);
+    c.tz = Math.min(1.8, window.innerWidth * .86 / OBJECT_WIDTH, window.innerHeight * .75 / (OBJECT_HEIGHT + 100));
     c.vx = c.vy = 0;
     setIndexOpen(false); setTouched(true);
     stage.current?.focus();
@@ -67,15 +71,16 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       c.ty += (y - el.clientHeight / 2) * (1 / c.tz - 1 / z);
       c.tz = z; c.vx = c.vy = 0;
     };
-    // Start with the first pair of assets; a short dolly settles before interaction.
+    // Desktop opens on two islands; a narrow screen opens on one readable object.
     const c = cam.current;
-    c.x = c.tx = 1475; c.y = c.ty = 900;
-    c.z = Math.max(min(), Math.min(.48, el.clientWidth / 2800));
+    const narrow = el.clientWidth < 650;
+    c.x = c.tx = narrow ? 750 : 1475; c.y = c.ty = narrow ? 680 : 820;
+    c.z = Math.max(min(), Math.min(.58, el.clientWidth / (narrow ? 1050 : 2500)));
     c.tz = c.z;
     const intro = window.setTimeout(() => {
       if (userInteracted.current || blocked.current) return;
-      c.ty = 750;
-      c.tz = Math.max(min(), Math.min(.62, el.clientWidth / 2500));
+      c.ty = narrow ? 670 : 730;
+      c.tz = Math.max(min(), Math.min(.62, el.clientWidth / (narrow ? 1000 : 2500)));
       if (reduced.matches) { c.y = c.ty; c.z = c.tz; }
     }, 180);
     const down = (e: PointerEvent) => {
@@ -150,26 +155,16 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     return () => { clearTimeout(intro); cancelAnimationFrame(frame); el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", keys); };
   }, []);
 
-  return <main className="stocks-page stock-universe">
+  return <main className="stocks-page stock-universe stock-voxel-universe">
     <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Use Index for an accessible asset list.">
-      {isDark && <div className="stock-structure-flow" aria-hidden="true">
+      {isDark && webglReady && <div className="stock-structure-flow" aria-hidden="true">
         <StructureFlowCollection variant="structure-flow" speed={1.00} pointSize={0.080} opacity={0.40} maskStart={0.20} maskSolid={0.50} />
       </div>}
+      <VoxelGallery camera={cam} dark={isDark} onWebGL={setWebglReady} />
       <div ref={world} className="stock-world">
         {[-1,0,1].flatMap(rx => [-1,0,1].map(ry => <div key={`${rx}-${ry}`} className="stock-world-tile" style={{left: rx * W, top: ry * H}} aria-hidden="true">
-          <div className="stock-money stock-money-coin stock-money-one"><span>$</span></div>
-          <div className="stock-money stock-money-note"><span>$</span></div>
-          <div className="stock-money stock-money-coin stock-money-two"><span>◈</span></div>
-          <div className="stock-money stock-money-coin stock-money-three"><span>$</span></div>
-          <div className="stock-money stock-money-coin stock-money-four"><span>◈</span></div>
-          <div className="stock-money stock-money-note stock-money-note-two"><span>$</span></div>
-          <div className="stock-orbit stock-orbit-one" /><div className="stock-orbit stock-orbit-two" />
-          <div className="stock-ambient-type stock-ambient-type-one">BUILT<br />ON BASE</div>
-          <div className="stock-ambient-type stock-ambient-type-two">TOKENIZED STOCKS</div>
-          <div className="stock-ambient-type stock-ambient-type-three">ONCHAIN EQUITIES</div>
-          <div className="stock-world-title">EQUITIES.<br /><span>WITHOUT WALLS.</span><small>BASESCOUT / TOKENIZED STOCK RESEARCH</small></div>
-          {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className={`stock-exhibit stock-exhibit-${i % 3}`} style={{left:a.x - 380, top:a.y - 225}}>
-            <small>{String(i+1).padStart(2,"0")} — BASE / B20</small><strong>{a.symbol.replace(/c$/,"")}</strong><div><span>{a.name}</span><span>Open report ↗</span></div>
+          {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className="stock-voxel-exhibit" style={{left:a.x - OBJECT_WIDTH/2, top:a.y - OBJECT_HEIGHT/2}}>
+            <div className="stock-object-caption"><span className="stock-object-number">{String(i+1).padStart(2,"0")} / 13</span><div><strong>{a.name}</strong><small>{a.symbol.replace(/c$/,"")} · B20</small></div><span className="stock-object-open">Research <ArrowUpRight size={24} /></span></div>
           </div>)}
         </div>))}
       </div>
