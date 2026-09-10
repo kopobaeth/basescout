@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Moon, Sun, ArrowUpRight } from "lucide-react";
+import {
+  Moon, Sun, ArrowUpRight, MonitorSmartphone, PackageCheck, Landmark,
+  CircleDollarSign, Database, Cpu, Glasses, CloudCog, Bitcoin,
+  Microchip, HardDrive, Rocket, CarFront, type LucideIcon,
+} from "lucide-react";
 import { STOCKS, stockPath } from "./catalog";
 import type { ThemePreference } from "../../theme";
 import "./stocks-canvas.css";
@@ -14,6 +18,10 @@ const W = 6000, H = 4200;
 const exhibits = STOCKS.map((stock, i) => ({ ...stock, x: 750 + i % 4 * 1450, y: 620 + Math.floor(i / 4) * 1050 }));
 const wrap = (n: number, size: number) => ((n % size) + size) % size;
 type Point = { x: number; y: number };
+const STOCK_INDEX_ICONS: LucideIcon[] = [
+  MonitorSmartphone, PackageCheck, Landmark, CircleDollarSign, Database,
+  Cpu, Glasses, CloudCog, Bitcoin, Microchip, HardDrive, Rocket, CarFront,
+];
 
 export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePreference; onThemeChange: (theme: ThemePreference) => void }) {
   const stage = useRef<HTMLDivElement>(null);
@@ -185,7 +193,10 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       <header><span>{exhibits.length} assets</span><button onClick={() => {setIndexOpen(false); indexButton.current?.focus();}}>Close</button></header>
       <input ref={indexInput} aria-label="Search stocks" placeholder="Company or ticker" value={query} onChange={e => setQuery(e.target.value)} />
       {!exhibits.some(a => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())) && <p role="status">No matching stocks. Try a company name or ticker.</p>}
-      <div className="stock-index-list">{exhibits.map((a,i) => ({a,i})).filter(({a}) => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())).map(({a,i}) => <div className="stock-index-row" key={a.address}><button onClick={() => fly(i)}><small>{String(i+1).padStart(2,"0")}</small><span>{a.name}<small>{a.symbol} / Fly to asset</small></span></button><button aria-label={`Open ${a.name} report`} onClick={() => {setIndexOpen(false);setSelected(i);}}>↗</button></div>)}</div>
+      <div className="stock-index-list">{exhibits.map((a,i) => ({a,i})).filter(({a}) => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())).map(({a,i}) => {
+        const StockIcon = STOCK_INDEX_ICONS[i];
+        return <div className="stock-index-row" key={a.address}><button onClick={() => fly(i)}><span className="stock-index-icon"><StockIcon size={19} strokeWidth={1.7} aria-hidden="true" /></span><span>{a.name}<small>{a.symbol} / Fly to asset</small></span></button><button aria-label={`Open ${a.name} report`} onClick={() => {setIndexOpen(false);setSelected(i);}}>↗</button></div>;
+      })}</div>
       <p>Explore the canvas, or open a report directly.</p>
     </aside>}
     <dialog ref={dialog} aria-label="Stock research report" className="stock-report-dialog" onCancel={() => setSelected(null)} onClose={() => {setSelected(null);indexButton.current?.focus();}}>
