@@ -28,6 +28,12 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
   const fallbackCanvas=gl?undefined:document.createElement("canvas");
   if(fallbackCanvas) {fallbackCanvas.className="stock-voxel-software";canvas.after(fallbackCanvas);canvas.hidden=true;}
   const ctx=fallbackCanvas?.getContext("2d");
+  // Shared world-space infrastructure stays aligned with both rendering paths.
+  const network=document.createElement("canvas");
+  network.className="stock-district-network";network.setAttribute("aria-hidden","true");canvas.before(network);
+  const networkContext=network.getContext("2d");
+  const reduced=window.matchMedia("(prefers-reduced-motion: reduce)");
+  let networkFrame=-1,hoverStrength=0;
   const models=new Map<number,StockModel>();
   const sprites=new Map<number,HTMLCanvasElement>();
   const scenes=new Map<number,{scene:THREE.Scene;group:THREE.Group;materials:THREE.Material[];key:THREE.DirectionalLight;fill:THREE.HemisphereLight}>();
@@ -64,11 +70,46 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
     if(w===width && h===height)return;
     width=w;height=h;dirty=true;
     gl?.setSize(w,h,false);
+    const networkDpr=Math.min(window.devicePixelRatio,1.5);
+    network.width=Math.round(w*networkDpr);network.height=Math.round(h*networkDpr);
+    networkContext?.setTransform(networkDpr,0,0,networkDpr,0,0);
     if(fallbackCanvas){const dpr=Math.min(window.devicePixelRatio,1.5);fallbackCanvas.width=Math.round(w*dpr);fallbackCanvas.height=Math.round(h*dpr);ctx?.setTransform(dpr,0,0,dpr,0,0);}
   }
   function render(view:GalleryCamera,w:number,h:number,dark:boolean,hover:number,lean:number) {
     resize(w,h);
-    const signature=[view.x.toFixed(2),view.y.toFixed(2),view.z.toFixed(4),dark,hover,lean.toFixed(3)].join('/');
+    const tick=reduced.matches?0:Math.floor(performance.now()/50);
+    const cameraSignature=[view.x.toFixed(2),view.y.toFixed(2),view.z.toFixed(4),dark,hover,lean.toFixed(3)].join('/');
+    if(networkContext && (dirty||tick!==networkFrame||!last.startsWith(cameraSignature))) {
+      networkFrame=tick;
+      const n=networkContext;n.clearRect(0,0,w,h);
+      n.strokeStyle=dark?"#67a8c00c":"#183e5315";n.lineWidth=1;
+      const spacing=180*view.z;
+      if(spacing>24) {
+        const ox=((w/2-view.x*view.z)%spacing+spacing)%spacing;
+        const oy=((h/2-view.y*view.z)%spacing+spacing)%spacing;
+        n.beginPath();for(let x=ox;x<w;x+=spacing){n.moveTo(x,0);n.lineTo(x,h)}
+        for(let y=oy;y<h;y+=spacing){n.moveTo(0,y);n.lineTo(w,y)}n.stroke();
+      }
+      for(let rx=-1;rx<=1;rx++)for(let ry=-1;ry<=1;ry++)positions.forEach((a,i)=>{
+        for(const j of [i%4<3?i+1:-1,i+4]) {
+          if(j<0||j>=positions.length)continue;
+          const b=positions[j];
+          const x=w/2+(a.x+rx*WORLD_WIDTH-view.x)*view.z;
+          const y=h/2+(a.y+ry*WORLD_HEIGHT-view.y+175)*view.z;
+          const bx=x+(b.x-a.x)*view.z,by=y+(b.y-a.y)*view.z;
+          if(Math.max(x,bx)<-100||Math.min(x,bx)>w+100||Math.max(y,by)<-100||Math.min(y,by)>h+100)continue;
+          const active=hover===i||hover===j;
+          n.strokeStyle=dark?(active?"#64caff80":"#3875a033"):(active?"#0052ff99":"#295d7738");
+          n.lineWidth=active?1.5:1;n.beginPath();n.moveTo(x,y);n.lineTo(bx,by);n.stroke();
+          const t=reduced.matches?.5:((tick*.005+i*.17)%1);
+          n.fillStyle=dark?(active?"#a3e6ff":"#72acd0") : "#0052ff";
+          n.shadowColor="#0052ff";n.shadowBlur=active?12:4;
+          n.fillRect(x+(bx-x)*t-2,y+(by-y)*t-2,4,4);n.shadowBlur=0;
+        }
+      });
+    }
+    hoverStrength=reduced.matches?0:hoverStrength+((hover>=0?1:0)-hoverStrength)*.12;
+    const signature=cameraSignature+"/"+hoverStrength.toFixed(2);
     if(!dirty && last===signature)return;
     last=signature;dirty=false;
     if(gl){gl.setScissorTest(false);gl.setViewport(0,0,width,height);gl.clear(true,true,true);gl.setScissorTest(true);}
@@ -81,6 +122,9 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
       if(gl) {
         const item=sceneFor(i);
         item.group.rotation.y=hover===i?lean*.22:0;
+        item.group.position.y=hover===i?hoverStrength*.35:0;
+        item.group.scale.setScalar(hover===i?1+hoverStrength*.035:1);
+        item.key.intensity=dark?(hover===i?3.6:3.1):3.1;
         item.fill.intensity=dark ? .9 : 1.3;
         const left=Math.max(0,x),bottom=Math.max(0,height-y-vh);
         gl.setViewport(x,height-y-vh,vw,vh);
@@ -88,14 +132,16 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
         gl.render(item.scene,camera);
       } else if(ctx) {
         if(!sprites.has(i))sprites.set(i,renderModelFallback(model(i)));
-        ctx.drawImage(sprites.get(i)!,x,y,vw,vh);
+        const lift=hover===i?hoverStrength*7*view.z:0;
+        const scale=hover===i?1+hoverStrength*.035:1;
+        ctx.drawImage(sprites.get(i)!,x-vw*(scale-1)/2,y-vh*(scale-1)/2-lift,vw*scale,vh*scale);
       }
     });
     gl?.setScissorTest(false);
   }
   function dispose() {
     for(const s of scenes.values()){s.materials.forEach(m=>m.dispose());(s.key.shadow.map as THREE.WebGLRenderTarget|null)?.dispose();s.scene.clear();}
-    cube.dispose();gl?.dispose();fallbackCanvas?.remove();sprites.clear();scenes.clear();models.clear();
+    cube.dispose();gl?.dispose();fallbackCanvas?.remove();network.remove();sprites.clear();scenes.clear();models.clear();
   }
   return {render,dispose,mode:gl?"webgl":"software",invalidate:()=>{dirty=true}};
 }
