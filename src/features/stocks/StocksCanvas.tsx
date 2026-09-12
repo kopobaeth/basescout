@@ -188,8 +188,8 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
         });
         exhibits.forEach((a, i) => {
           const active = hoveredRef.current === i;
-          ctx.fillStyle = active ? "#70d7ff" : isDark ? "#91a8b3" : "#365765";
-          ctx.shadowColor = active ? "#2abfff" : "transparent"; ctx.shadowBlur = active ? 8 : 0;
+          ctx.fillStyle = active ? "#0000ff" : isDark ? "#b1b7c3" : "#5b616e";
+          ctx.shadowColor = active ? "#0000ff" : "transparent"; ctx.shadowBlur = active ? 8 : 0;
           ctx.beginPath(); ctx.arc(a.x / W * 180, a.y / H * 126, active ? 4 : 2.2, 0, Math.PI * 2); ctx.fill();
         });
         ctx.shadowBlur = 0;

@@ -12,6 +12,8 @@
   "dependencies": {
     "@base-org/account": "^2.5.8",
     "@fontsource/inter": "^5.3.0",
+    "@fontsource/inter-tight": "^5.3.0",
+    "@fontsource/roboto-mono": "^5.3.0",
     "@vercel/analytics": "^2.0.1",
     "lucide-react": "^0.468.0",
     "ox": "^1.7.1",

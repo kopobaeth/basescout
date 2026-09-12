@@ -26,6 +26,7 @@ import {
 import { trackEvent } from "../../analytics";
 import "./stocks.css";
 import StocksCanvas from "./StocksCanvas";
+import "./stocks-base-brand.css";
 const SAVE_KEY = "basescout.stocks.saved";
 function readSaved(): string[] {
   try {
@@ -143,7 +144,7 @@ export function StocksPage() {
     const description = document.querySelector('meta[name="description"]');
     description?.setAttribute(
       "content",
-      "Research Coinbase tokenized stocks on Base: official addresses, market context, and B20 mechanics.",
+      "Research tokenized equities on Base: verify official addresses, review market context, and understand B20 mechanics.",
     );
     const canonical = document.querySelector('link[rel="canonical"]');
     canonical?.setAttribute(
@@ -268,7 +269,7 @@ export function StocksPage() {
             <h1>{selected ? selected.name : <>Equities.<br /><span className="stocks-outline">Onchain.</span></>}</h1>
             <p>
               {selected
-                ? `${selected.symbol} · Coinbase-issued tokenized equity on Base`
+                ? `${selected.symbol} · Tokenized equity issued by Coinbase on Base`
                 : "Explore tokenized equities. Check the address, understand the mechanics, and see what the data covers."}
             </p>
           </div>

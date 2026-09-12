@@ -25,7 +25,7 @@ export function readThemePreference(): ThemePreference {
 function updateThemeColor(theme: ResolvedTheme) {
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute(
     "content",
-    theme === "dark" ? "#000000" : "#f4f7fb"
+    theme === "dark" ? "#0a0b0d" : "#ffffff"
   );
 }
 
