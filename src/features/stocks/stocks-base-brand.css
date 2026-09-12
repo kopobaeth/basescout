@@ -301,8 +301,9 @@ html[data-theme="light"] .stocks-detail-grid .stocks-button-primary:hover {
   font-size: 10px;
 }
 
-.stock-object-open {
+.stock-universe .stock-object-open {
   color: var(--stock-accent-text);
+  opacity: 1;
   font-weight: 600;
 }
 
