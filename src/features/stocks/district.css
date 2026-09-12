@@ -1,0 +1,31 @@
+/* District infrastructure sits beneath the existing physical miniatures. */
+.stock-district-network { position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.85; }
+.stock-district .stock-stage { background:radial-gradient(ellipse at 18% 34%,#18303b,transparent 56%),radial-gradient(ellipse at 88% 62%,#29251e,transparent 48%),#080f16; }
+.district-heading { position:absolute;left:32px;top:104px;pointer-events:none;transition:opacity .3s; }
+.district-heading>span { color:#83b5d1;font:600 12px/1.5 Inter,sans-serif;letter-spacing:.19em; }
+.district-heading p { color:#d5e1e6;font:400 18px/1.5 Inter,sans-serif;margin:7px 0;letter-spacing:-.025em; }
+.stock-district .stock-object-caption { border-top-color:#6899b342;transition:border-color .25s,filter .25s; }
+.stock-district .stock-voxel-exhibit:hover .stock-object-caption { border-color:#69caffaa;filter:drop-shadow(0 0 12px #0052ff44); }
+.stock-district .stock-voxel-exhibit:hover .stock-object-open { color:#91d8ff; }
+.stock-district .stock-report-dialog { inset:12px 12px 12px auto;margin:0;width:min(620px,48vw);height:calc(100dvh - 24px);border:1px solid #56849b66;border-radius:18px;background:#0b1219;box-shadow:-24px 0 90px #0006; }
+.stock-district .stock-report-dialog[open] { animation:district-panel-in .35s ease-out; }
+.stock-district .stock-report-dialog::backdrop { background:#030a1226;backdrop-filter:none; }
+.stock-district .stock-report-dialog header { padding:20px;font:500 14px/1.5 Inter,sans-serif;border-color:#6a8eaa33;background:#0d1924; }
+.stock-district .stock-report-dialog header button { min-width:36px;min-height:36px; }
+.district-report-context { display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #6a8eaa33;font:500 12px/1.5 Inter,sans-serif;color:#9db1c1; }
+.district-report-context a { display:flex;align-items:center;gap:6px;color:#8fc8ff;font-size:14px; }
+.stock-district.has-research .district-heading { opacity:.35; }
+.stock-district .stock-index { background:#0b141df5;border-color:#47718b66; }
+.stock-district .stock-index header,.stock-district .stock-index input { font-family:Inter,sans-serif;font-size:14px; }
+.stock-district .stock-index-row small { font-size:12px; }
+.stock-district .stock-map span { color:#9db3c2;font-size:12px;letter-spacing:.08em; }
+[data-theme="light"] .district-heading>span { color:#275775; }
+[data-theme="light"] .district-heading p { color:#203239; }
+@keyframes district-panel-in { from { opacity:0;transform:translateX(32px); } to { opacity:1;transform:translateX(0); } }
+@media(max-width:900px) {
+  .stock-district .stock-report-dialog { inset:auto 0 0;width:100%;height:86dvh;border-radius:18px 18px 0 0; }
+  .stock-district .stock-report-dialog::backdrop { background:#030a1266; }
+  .district-heading { top:85px;left:20px; }
+  .district-heading p { font-size:16px; }
+}
+@media(prefers-reduced-motion:reduce) { .stock-district .stock-report-dialog[open] { animation:none; }.district-heading,.stock-district .stock-object-caption { transition:none; } }

@@ -13,6 +13,7 @@ import "../../shaders/structure-flow/styles.css";
 import { VoxelGallery } from "./voxel/VoxelGallery";
 import { OBJECT_WIDTH, OBJECT_HEIGHT } from "./voxel/models";
 import "./voxel/voxel.css";
+import "./district.css";
 
 const W = 6000, H = 4200;
 const exhibits = STOCKS.map((stock, i) => ({ ...stock, x: 750 + i % 4 * 1450, y: 620 + Math.floor(i / 4) * 1050 }));
@@ -61,7 +62,15 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   };
   useEffect(() => {
     setReportReady(false);
-    if (selected !== null) dialog.current?.showModal();
+    if (selected !== null) {
+      const c=cam.current,a=exhibits[selected];
+      const panelWidth=window.innerWidth>900?Math.min(620,window.innerWidth*.48):0;
+      const z=Math.min(.92,(window.innerWidth-panelWidth)*.88/OBJECT_WIDTH,window.innerHeight*.72/(OBJECT_HEIGHT+100));
+      c.tx=c.x+wrap(a.x-c.x+W/2,W)-W/2+panelWidth/(2*z);
+      c.ty=c.y+wrap(a.y-c.y+H/2,H)-H/2+70;
+      c.tz=Math.max(.32,z);c.vx=c.vy=0;
+      dialog.current?.showModal();
+    }
     else dialog.current?.close();
   }, [selected]);
   useEffect(() => { if (indexOpen) indexInput.current?.focus(); }, [indexOpen]);
@@ -83,12 +92,12 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     const c = cam.current;
     const narrow = el.clientWidth < 650;
     c.x = c.tx = narrow ? 750 : 1475; c.y = c.ty = narrow ? 680 : 820;
-    c.z = Math.max(min(), Math.min(.58, el.clientWidth / (narrow ? 1050 : 2500)));
+    c.z = Math.max(min(), Math.min(.76, el.clientWidth / (narrow ? 980 : 2150)));
     c.tz = c.z;
     const intro = window.setTimeout(() => {
       if (userInteracted.current || blocked.current) return;
       c.ty = narrow ? 670 : 730;
-      c.tz = Math.max(min(), Math.min(.62, el.clientWidth / (narrow ? 1000 : 2500)));
+      c.tz = Math.max(min(), Math.min(.78, el.clientWidth / (narrow ? 960 : 2150)));
       if (reduced.matches) { c.y = c.ty; c.z = c.tz; }
     }, 180);
     const down = (e: PointerEvent) => {
@@ -163,7 +172,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     return () => { clearTimeout(intro); cancelAnimationFrame(frame); el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", keys); };
   }, []);
 
-  return <main className="stocks-page stock-universe stock-voxel-universe">
+  return <main className={`stocks-page stock-universe stock-voxel-universe stock-district${selected!==null?" has-research":""}`}>
     <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Use Index for an accessible asset list.">
       {isDark && webglReady && <div className="stock-structure-flow" aria-hidden="true">
         <StructureFlowCollection variant="structure-flow" speed={1.00} pointSize={0.080} opacity={0.40} maskStart={0.20} maskSolid={0.50} />
@@ -187,6 +196,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
         </div>
       </div>
     </header>
+    <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p></div>
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
     {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
@@ -200,7 +210,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       <p>Explore the canvas, or open a report directly.</p>
     </aside>}
     <dialog ref={dialog} aria-label="Stock research report" className="stock-report-dialog" onCancel={() => setSelected(null)} onClose={() => {setSelected(null);indexButton.current?.focus();}}>
-      {selected !== null && <><header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><button onClick={() => setSelected(null)}>Close</button></div></header>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} /></>}
+      {selected !== null && <><header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><button onClick={() => setSelected(null)}>Close</button></div></header><div className="district-report-context"><span>B20 · {exhibits[selected].symbol}</span><a href={stockPath(exhibits[selected].address)} target="_blank" rel="noreferrer">Full report <ArrowUpRight size={14} /></a></div>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} /></>}
     </dialog>
   </main>;
 }
