@@ -125,10 +125,10 @@
 .stock-ambient-type-two { left:380px;top:3450px;font-size:116px;letter-spacing:.08em;transform:rotate(3deg); }
 .stock-ambient-type-three { left:4100px;top:2050px;font-size:94px;letter-spacing:.12em;transform:rotate(88deg);transform-origin:left top; }
 [data-theme="dark"] .stock-ambient-type { opacity:.5;-webkit-text-stroke-color:#709cff2e;background-image:repeating-linear-gradient(90deg,#8db1ff30 0 3px,transparent 3px 9px);filter:drop-shadow(0 0 28px #0052ff26); }
-/* A precise pointer with a Base-blue halo; native cursor keeps working over dialogs and embeds. */
-.stock-universe, .stock-universe *, .stocks-embedded, .stocks-embedded * { cursor:url('/stocks-cursor.svg') 8 7, auto!important; }
-.stock-stage:active { cursor:url('/stocks-cursor.svg') 8 7, grabbing!important; }
-.stock-voxel-exhibit, .stock-voxel-exhibit * { cursor:url('/stocks-cursor-hover.svg') 9 8, pointer!important; }
+/* A precise pointer with a Base-blue halo; the hotspot sits at the halo center. */
+.stock-universe, .stock-universe *, .stocks-embedded, .stocks-embedded * { cursor:url('/stocks-cursor.svg') 26 26, auto!important; }
+.stock-stage:active { cursor:url('/stocks-cursor.svg') 26 26, grabbing!important; }
+.stock-voxel-exhibit, .stock-voxel-exhibit * { cursor:url('/stocks-cursor-hover.svg') 31 31, pointer!important; }
 
 .stock-index { padding:24px; }
 .stock-index header { font-size:14px; font-weight:650; letter-spacing:-.2px; }

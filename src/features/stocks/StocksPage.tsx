@@ -312,6 +312,26 @@ export function StocksPage() {
                   <CheckCircle2 size={14} /> Official address match
                 </p>
                 <p className="stocks-address">{selected.address}</p>
+                <div className="stocks-external-actions" aria-label="External market sources">
+                  <a
+                    className="stocks-button stocks-button-primary"
+                    href={`https://basescan.org/token/${selected.address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on BaseScan <ArrowUpRight size={15} />
+                  </a>
+                  {snapshot?.market.pairAddress && (
+                    <a
+                      className="stocks-button stocks-button-primary"
+                      href={`https://dexscreener.com/base/${snapshot.market.pairAddress}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      DEX Screener <ArrowUpRight size={15} />
+                    </a>
+                  )}
+                </div>
                 <div className="stocks-actions stocks-action-buttons">
                   <button onClick={() => void copy(selected.address)}>
                     <Copy size={15} /> Copy address
@@ -353,26 +373,6 @@ export function StocksPage() {
                   >
                     <RefreshCw size={17} />
                   </button>
-                </div>
-                <div className="stocks-external-actions" aria-label="External market sources">
-                  <a
-                    className="stocks-button stocks-button-primary"
-                    href={`https://basescan.org/token/${selected.address}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View on BaseScan <ArrowUpRight size={15} />
-                  </a>
-                  {snapshot?.market.pairAddress && (
-                    <a
-                      className="stocks-button stocks-button-primary"
-                      href={`https://dexscreener.com/base/${snapshot.market.pairAddress}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      DEX Screener <ArrowUpRight size={15} />
-                    </a>
-                  )}
                 </div>
                 {loading ? (
                   <p role="status">Loading market and onchain data…</p>
