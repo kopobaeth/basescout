@@ -123,6 +123,7 @@ export function StocksPage() {
   const route = window.location.pathname.split("/").filter(Boolean);
   const selected = route.length === 2 ? findStock(route[1]) : undefined;
   const invalidRoute = route.length > 1 && !selected;
+  const embedded = new URLSearchParams(location.search).has("embed");
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState(readSaved);
   const [onlySaved, setOnlySaved] = useState(false);
@@ -134,6 +135,9 @@ export function StocksPage() {
   const [reload, setReload] = useState(0);
   const [now, setNow] = useState(Date.now());
   useEffect(() => applyThemePreference(theme), [theme]);
+  useEffect(() => {
+    if ((selected || invalidRoute) && !embedded) location.replace("/stocks");
+  }, [embedded, invalidRoute, selected]);
   useEffect(() => {
     document.title = `${selected?.symbol ?? "Tokenized Stocks"} | BaseScout`;
     const description = document.querySelector('meta[name="description"]');
@@ -159,7 +163,7 @@ export function StocksPage() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || !embedded) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 18000);
     let active = true;
@@ -197,7 +201,7 @@ export function StocksPage() {
       controller.abort();
       clearTimeout(timeout);
     };
-  }, [selected, reload]);
+  }, [embedded, selected, reload]);
   function toggleSave(address: string) {
     const next = saved.includes(address)
       ? saved.filter((a) => a !== address)
@@ -232,8 +236,9 @@ export function StocksPage() {
   );
   const stale = snapshot && now - snapshot.fetchedAt > 120000;
   if (!selected && !invalidRoute) return <StocksCanvas theme={theme} onThemeChange={setTheme} />;
+  if (!embedded) return null;
   return (
-    <main className={`stocks-page ${new URLSearchParams(location.search).has("embed") ? "stocks-embedded" : ""}`}>
+    <main className="stocks-page stocks-embedded">
       <header className="stocks-nav">
         <a href="/" className="stocks-brand">
           <span className="stock-uploaded-logo"><img src="/basescout-bull.png" alt="" /></span>
@@ -257,9 +262,6 @@ export function StocksPage() {
         </select>
       </header>
       <div className="stocks-content">
-        <div className="stocks-eyebrow">
-          <span /> BASE EQUITY RESEARCH
-        </div>
         <section className="stocks-hero">
           {selected && <StockLogo symbol={selected.symbol} large />}
           <div className="stocks-hero-copy">
@@ -321,9 +323,6 @@ export function StocksPage() {
                     <Bookmark size={15} />
                     {saved.includes(selected.address) ? "Unsave" : "Save asset"}
                   </button>
-                  <button onClick={() => void copy(`${location.origin}${stockPath(selected.address)}`)}>
-                    Copy report link
-                  </button>
                 </div>
                 <dl>
                   <div>
@@ -343,16 +342,6 @@ export function StocksPage() {
                   List membership confirms the address mapping, not investment
                   safety or your ability to trade.
                 </p>
-                <div className="stocks-actions">
-                  <a
-                    className="stocks-button stocks-button-primary"
-                    href={`https://basescan.org/token/${selected.address}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View on BaseScan <ArrowUpRight size={15} />
-                  </a>
-                </div>
               </section>
               <section className="stocks-panel" aria-busy={loading}>
                 <div className="stocks-section-heading">
@@ -415,18 +404,28 @@ export function StocksPage() {
                         : ""}
                       Retrieved {new Date(snapshot.fetchedAt).toLocaleString()}.
                     </p>
-                    {snapshot.market.pairAddress && (
-                      <a
-                        className="stocks-button stocks-button-primary stocks-market-link"
-                        href={`https://dexscreener.com/base/${snapshot.market.pairAddress}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        DEX Screener <ArrowUpRight size={15} />
-                      </a>
-                    )}
                   </>
                 ) : null}
+                <div className="stocks-external-actions" aria-label="External market sources">
+                  <a
+                    className="stocks-button stocks-button-primary"
+                    href={`https://basescan.org/token/${selected.address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on BaseScan <ArrowUpRight size={15} />
+                  </a>
+                  {snapshot?.market.pairAddress && (
+                    <a
+                      className="stocks-button stocks-button-primary"
+                      href={`https://dexscreener.com/base/${snapshot.market.pairAddress}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      DEX Screener <ArrowUpRight size={15} />
+                    </a>
+                  )}
+                </div>
               </section>
             </div>
             <section className="stocks-panel stocks-mechanics">
@@ -535,7 +534,7 @@ export function StocksPage() {
           </p>
           <div>
             <a href={STOCK_SOURCE} target="_blank" rel="noreferrer">
-              Official B20 source <ArrowUpRight size={13} />
+              Official B20 sources <ArrowUpRight size={13} />
             </a>
             <a
               href="https://www.coinbase.com/tokenize"

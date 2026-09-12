@@ -37,7 +37,6 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const world = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLCanvasElement>(null);
   const readout = useRef<HTMLSpanElement>(null);
-  const sectorReadout = useRef<HTMLSpanElement>(null);
   const indexInput = useRef<HTMLInputElement>(null);
   const indexButton = useRef<HTMLButtonElement>(null);
   const userInteracted = useRef(false);
@@ -45,8 +44,9 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const [indexOpen, setIndexOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
-  const selectedRef = useRef<number | null>(null);
-  selectedRef.current = selected;
+  const [hovered, setHovered] = useState<number | null>(null);
+  const hoveredRef = useRef<number | null>(null);
+  hoveredRef.current = hovered;
   const [touched, setTouched] = useState(false);
   const [reportReady, setReportReady] = useState(false);
   const [webglReady, setWebglReady] = useState(false);
@@ -175,9 +175,6 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       c.x -= wx; c.tx -= wx; c.y -= wy; c.ty -= wy;
       world.current!.style.transform = `translate3d(${el.clientWidth / 2 - c.x * c.z}px,${el.clientHeight / 2 - c.y * c.z}px,0) scale(${c.z})`;
       if (readout.current) readout.current.textContent = `${Math.round(c.x).toString().padStart(4,"0")} / ${Math.round(c.y).toString().padStart(4,"0")} — ${Math.round(c.z * 100)}%`;
-      const nearest = nearestExhibit(c);
-      const activeSector = selectedRef.current ?? nearest;
-      if (sectorReadout.current) sectorReadout.current.textContent = `${String(activeSector + 1).padStart(2,"0")} / ${exhibits[activeSector].name} · ${exhibits[activeSector].symbol.replace(/c$/, "")}`;
       const ctx = map.current?.getContext("2d");
       if (ctx) {
         ctx.clearRect(0, 0, 180, 126);
@@ -190,7 +187,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
           }
         });
         exhibits.forEach((a, i) => {
-          const active = selectedRef.current === i || (selectedRef.current === null && nearest === i);
+          const active = hoveredRef.current === i;
           ctx.fillStyle = active ? "#70d7ff" : isDark ? "#91a8b3" : "#365765";
           ctx.shadowColor = active ? "#2abfff" : "transparent"; ctx.shadowBlur = active ? 8 : 0;
           ctx.beginPath(); ctx.arc(a.x / W * 180, a.y / H * 126, active ? 4 : 2.2, 0, Math.PI * 2); ctx.fill();
@@ -211,7 +208,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       {isDark && webglReady && <div className="stock-structure-flow" aria-hidden="true">
         <StructureFlowCollection variant="structure-flow" speed={1.00} pointSize={0.080} opacity={0.40} maskStart={0.20} maskSolid={0.50} />
       </div>}
-      <VoxelGallery camera={cam} dark={isDark} selected={selected} onWebGL={setWebglReady} />
+      <VoxelGallery camera={cam} dark={isDark} selected={selected} onHover={setHovered} onWebGL={setWebglReady} />
       <div ref={world} className="stock-world">
         {[-1,0,1].flatMap(rx => [-1,0,1].map(ry => <div key={`${rx}-${ry}`} className="stock-world-tile" style={{left: rx * W, top: ry * H}} aria-hidden="true">
           {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className={`stock-voxel-exhibit${selected===i?" is-active":""}`} style={{left:a.x - OBJECT_WIDTH/2, top:a.y - OBJECT_HEIGHT/2}}>
@@ -230,7 +227,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
         </div>
       </div>
     </header>
-    <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p><div className="district-sector"><i aria-hidden="true" /><span>Active sector</span><strong ref={sectorReadout}>01 / Apple · AAPL</strong></div></div>
+    <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p></div>
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
     {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
@@ -244,7 +241,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       <p>Explore the canvas, or open a report directly.</p>
     </aside>}
     {selected !== null && <aside role="dialog" aria-modal="true" aria-label="Stock research report" className="stock-report-dialog">
-      <header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><button onClick={() => { setSelected(null); indexButton.current?.focus(); }}>Close</button></div></header><div className="district-report-context"><span>B20 · {exhibits[selected].symbol}</span><a href={stockPath(exhibits[selected].address)} target="_blank" rel="noreferrer">Full report <ArrowUpRight size={14} /></a></div>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} />
+      <header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><button onClick={() => { setSelected(null); indexButton.current?.focus(); }}>Close</button></div></header><div className="district-report-context"><span>B20 · {exhibits[selected].symbol}</span></div>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} />
     </aside>}
   </main>;
 }

@@ -694,6 +694,18 @@
   margin-top: 10px;
 }
 
+.stocks-external-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 230px);
+  gap: 9px;
+  align-content: start;
+  margin-top: 20px;
+}
+
+.stocks-external-actions .stocks-button {
+  width: 100%;
+}
+
 .stocks-mechanics article {
   padding-left: 16px;
   border-left: 2px solid var(--line);
@@ -720,7 +732,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-weight: 600;
+  color: #69a2ff;
+  font: 600 12px/1.55 Inter, system-ui, sans-serif;
+  letter-spacing: .015em;
 }
 
 @media (max-width: 850px) {

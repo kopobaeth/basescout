@@ -1,7 +1,7 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import type { GalleryCamera, VoxelRenderer } from "./renderer";
 
-export function VoxelGallery({ camera, dark, selected, onWebGL }: { camera:MutableRefObject<GalleryCamera>; dark:boolean; selected:number|null; onWebGL:(available:boolean)=>void }) {
+export function VoxelGallery({ camera, dark, selected, onHover, onWebGL }: { camera:MutableRefObject<GalleryCamera>; dark:boolean; selected:number|null; onHover:(index:number|null)=>void; onWebGL:(available:boolean)=>void }) {
   const canvasRef=useRef<HTMLCanvasElement>(null);
   const darkRef=useRef(dark);darkRef.current=dark;
   const selectedRef=useRef(selected);selectedRef.current=selected;
@@ -20,10 +20,11 @@ export function VoxelGallery({ camera, dark, selected, onWebGL }: { camera:Mutab
     const resume=()=>{stop();if(!document.hidden&&!lost)frame=requestAnimationFrame(draw)};
     const pointer=(event:PointerEvent)=>{
       const hit=(event.target as Element).closest<HTMLElement>("[data-stock-index]");
-      hover=hit?Number(hit.dataset.stockIndex):-1;
+      const next=hit?Number(hit.dataset.stockIndex):-1;
+      if(next!==hover){hover=next;onHover(hover>=0?hover:null)}
       lean=hit?Math.max(-1,Math.min(1,(event.clientX-hit.getBoundingClientRect().x)/hit.getBoundingClientRect().width*2-1)):0;
     };
-    const leave=()=>{hover=-1;lean=0};
+    const leave=()=>{hover=-1;lean=0;onHover(null)};
     const create=()=>import("./renderer").then(module=>{
       if(disposed)return;
       renderer=module.createVoxelGalleryRenderer(canvas);
@@ -45,6 +46,6 @@ export function VoxelGallery({ camera, dark, selected, onWebGL }: { camera:Mutab
       host.removeEventListener("pointermove",pointer);host.removeEventListener("pointerleave",leave);
       canvas.removeEventListener("webglcontextlost",onLost);canvas.removeEventListener("webglcontextrestored",onRestored);
     };
-  },[camera,onWebGL]);
+  },[camera,onHover,onWebGL]);
   return <canvas ref={canvasRef} className="stock-voxel-canvas" aria-hidden="true" />;
 }
