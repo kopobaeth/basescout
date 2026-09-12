@@ -108,6 +108,17 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
           n.fillRect(x+(bx-x)*t-2,y+(by-y)*t-2,4,4);n.shadowBlur=0;
         }
       });
+      for(let rx=-1;rx<=1;rx++)for(let ry=-1;ry<=1;ry++)positions.forEach((a,i)=>{
+        const x=w/2+(a.x+rx*WORLD_WIDTH-view.x)*view.z;
+        const y=h/2+(a.y+ry*WORLD_HEIGHT-view.y+175)*view.z;
+        if(x<-30||x>w+30||y<-30||y>h+30)return;
+        const active=focus===i;
+        n.fillStyle=dark?(active?"#d5f5ff":"#5795ad"):(active?"#0052ff":"#54717e");
+        n.strokeStyle=dark?(active?"#4ed4ff":"#366477"):(active?"#0052ff":"#6b8792");
+        n.lineWidth=1;n.shadowColor=active?(dark?"#23c7ff":"#0052ff"):"transparent";n.shadowBlur=active?18:0;
+        n.beginPath();n.arc(x,y,active?5:2.5,0,Math.PI*2);n.fill();
+        n.beginPath();n.arc(x,y,active?12:6,0,Math.PI*2);n.stroke();n.shadowBlur=0;
+      });
       if(focus>=0) for(let rx=-1;rx<=1;rx++)for(let ry=-1;ry<=1;ry++) {
         const a=positions[focus];
         const x=w/2+(a.x+rx*WORLD_WIDTH-view.x)*view.z;

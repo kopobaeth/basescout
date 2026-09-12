@@ -29,6 +29,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const world = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLCanvasElement>(null);
   const readout = useRef<HTMLSpanElement>(null);
+  const sectorReadout = useRef<HTMLSpanElement>(null);
   const indexInput = useRef<HTMLInputElement>(null);
   const indexButton = useRef<HTMLButtonElement>(null);
   const userInteracted = useRef(false);
@@ -165,6 +166,13 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       c.x -= wx; c.tx -= wx; c.y -= wy; c.ty -= wy;
       world.current!.style.transform = `translate3d(${el.clientWidth / 2 - c.x * c.z}px,${el.clientHeight / 2 - c.y * c.z}px,0) scale(${c.z})`;
       if (readout.current) readout.current.textContent = `${Math.round(c.x).toString().padStart(4,"0")} / ${Math.round(c.y).toString().padStart(4,"0")} — ${Math.round(c.z * 100)}%`;
+      let nearest = 0, nearestDistance = Infinity;
+      exhibits.forEach((a, i) => {
+        const distance = Math.hypot(wrap(a.x - c.x + W / 2, W) - W / 2, wrap(a.y - c.y + H / 2, H) - H / 2);
+        if (distance < nearestDistance) { nearest = i; nearestDistance = distance; }
+      });
+      const activeSector = selectedRef.current ?? nearest;
+      if (sectorReadout.current) sectorReadout.current.textContent = `${String(activeSector + 1).padStart(2,"0")} / ${exhibits[activeSector].name} · ${exhibits[activeSector].symbol.replace(/c$/, "")}`;
       const ctx = map.current?.getContext("2d");
       if (ctx) {
         ctx.clearRect(0, 0, 180, 126);
@@ -175,11 +183,6 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
             if (j < 0 || j >= exhibits.length) continue;
             ctx.beginPath(); ctx.moveTo(a.x / W * 180, a.y / H * 126); ctx.lineTo(exhibits[j].x / W * 180, exhibits[j].y / H * 126); ctx.stroke();
           }
-        });
-        let nearest = 0, nearestDistance = Infinity;
-        exhibits.forEach((a, i) => {
-          const distance = Math.hypot(wrap(a.x - c.x + W / 2, W) - W / 2, wrap(a.y - c.y + H / 2, H) - H / 2);
-          if (distance < nearestDistance) { nearest = i; nearestDistance = distance; }
         });
         exhibits.forEach((a, i) => {
           const active = selectedRef.current === i || (selectedRef.current === null && nearest === i);
@@ -222,7 +225,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
         </div>
       </div>
     </header>
-    <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p></div>
+    <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p><div className="district-sector"><i aria-hidden="true" /><span>Active sector</span><strong ref={sectorReadout}>01 / Apple · AAPL</strong></div></div>
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
     {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
