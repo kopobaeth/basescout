@@ -43,7 +43,8 @@
   --vantage-text-primary: var(--base-white);
   --vantage-text-secondary: var(--base-gray-30);
   --vantage-text-tertiary: var(--base-gray-50);
-  --vantage-accent: var(--base-blue);
+  /* Cerulean is the accessible text accent on black; Base Blue stays the action color. */
+  --vantage-accent: var(--base-cerulean);
   --vantage-surface-base: var(--base-black);
   --vantage-surface-raised: #111216;
   --vantage-surface-muted: #191b20;
@@ -381,7 +382,7 @@ html[data-theme="light"] .hero > .hero-hands {
 
 .hero h1 span,
 html[data-theme="light"] .hero h1 span {
-  color: var(--base-blue);
+  color: var(--vantage-accent);
   text-shadow: none;
 }
 
@@ -581,7 +582,7 @@ html[data-theme="light"] .metric strong .skeleton-line {
 }
 
 .market-badge.primary {
-  color: var(--base-blue);
+  color: var(--vantage-accent);
   background: color-mix(in srgb, var(--base-blue) 8%, var(--vantage-surface-raised));
   border-color: color-mix(in srgb, var(--base-blue) 40%, var(--vantage-border));
 }

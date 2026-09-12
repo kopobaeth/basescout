@@ -2,8 +2,13 @@
 .stocks-page,
 .stock-universe {
   --base-blue: #0000ff;
+  --stock-accent-text: var(--base-cerulean, #3c8aff);
   font-family: var(--brand-sans);
   font-variant-numeric: tabular-nums;
+}
+
+html[data-theme="light"] :is(.stocks-page, .stock-universe) {
+  --stock-accent-text: var(--base-blue);
 }
 
 .stocks-page {
@@ -171,7 +176,7 @@ html[data-theme="light"] .stocks-detail-grid .stocks-button-primary:hover {
 .stocks-page .stocks-card-link,
 .stocks-page .stocks-actions a,
 .stocks-page .stocks-footer a {
-  color: var(--base-blue);
+  color: var(--stock-accent-text);
 }
 
 .stocks-badge {
@@ -297,7 +302,7 @@ html[data-theme="light"] .stocks-detail-grid .stocks-button-primary:hover {
 }
 
 .stock-object-open {
-  color: var(--base-blue);
+  color: var(--stock-accent-text);
   font-weight: 600;
 }
 
@@ -342,6 +347,12 @@ html[data-theme="light"] .stocks-detail-grid .stocks-button-primary:hover {
   border-color: var(--line);
   font-family: var(--brand-sans);
   font-weight: 600;
+}
+
+.stock-district .stock-report-dialog header {
+  color: var(--ink);
+  background: var(--surface-base);
+  border-color: var(--line);
 }
 
 .stock-index input {
