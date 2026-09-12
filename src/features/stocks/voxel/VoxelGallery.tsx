@@ -1,9 +1,10 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import type { GalleryCamera, VoxelRenderer } from "./renderer";
 
-export function VoxelGallery({ camera, dark, onWebGL }: { camera:MutableRefObject<GalleryCamera>; dark:boolean; onWebGL:(available:boolean)=>void }) {
+export function VoxelGallery({ camera, dark, selected, onWebGL }: { camera:MutableRefObject<GalleryCamera>; dark:boolean; selected:number|null; onWebGL:(available:boolean)=>void }) {
   const canvasRef=useRef<HTMLCanvasElement>(null);
   const darkRef=useRef(dark);darkRef.current=dark;
+  const selectedRef=useRef(selected);selectedRef.current=selected;
   useEffect(()=>{
     const canvas=canvasRef.current!;
     const host=canvas.parentElement!;
@@ -13,7 +14,7 @@ export function VoxelGallery({ camera, dark, onWebGL }: { camera:MutableRefObjec
     const draw=()=>{
       frame=0;
       if(disposed||document.hidden||lost)return;
-      renderer?.render(camera.current,host.clientWidth,host.clientHeight,darkRef.current,hover,reduced.matches?0:lean);
+      renderer?.render(camera.current,host.clientWidth,host.clientHeight,darkRef.current,hover,reduced.matches?0:lean,selectedRef.current??-1);
       frame=requestAnimationFrame(draw);
     };
     const resume=()=>{stop();if(!document.hidden&&!lost)frame=requestAnimationFrame(draw)};
