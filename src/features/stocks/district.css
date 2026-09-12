@@ -22,6 +22,16 @@
 .stock-district .stock-index header,.stock-district .stock-index input { font-family:Inter,sans-serif;font-size:14px; }
 .stock-district .stock-index-row small { font-size:12px; }
 .stock-district .stock-map span { color:#9db3c2;font-size:12px;letter-spacing:.08em; }
+[data-theme="light"] .stock-district .stock-index { background:#eef5f7f8;border-color:#b7cbd3;color:#203239;box-shadow:-20px 0 80px #183e5320; }
+[data-theme="light"] .stock-district .stock-index header,
+[data-theme="light"] .stock-district .stock-index-row>button:first-child,
+[data-theme="light"] .stock-district .stock-index-row>button:last-child { color:#203239; }
+[data-theme="light"] .stock-district .stock-index input { background:#ffffffcc;border-color:#b7cbd3;color:#203239; }
+[data-theme="light"] .stock-district .stock-index-row { border-color:#bdd0d7; }
+[data-theme="light"] .stock-district .stock-index-row small,
+[data-theme="light"] .stock-district .stock-index>p { color:#52717c; }
+[data-theme="light"] .stock-district .stock-index-row>button>small { color:#0052ff; }
+[data-theme="light"] .stock-district .stock-index-row button:hover { background:#dcebf0; }
 [data-theme="light"] .district-heading>span { color:#275775; }
 [data-theme="light"] .district-heading p { color:#203239; }
 @keyframes district-panel-in { from { opacity:0;transform:translateX(32px); } to { opacity:1;transform:translateX(0); } }

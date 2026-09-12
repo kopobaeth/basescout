@@ -354,6 +354,26 @@ export function StocksPage() {
                     <RefreshCw size={17} />
                   </button>
                 </div>
+                <div className="stocks-external-actions" aria-label="External market sources">
+                  <a
+                    className="stocks-button stocks-button-primary"
+                    href={`https://basescan.org/token/${selected.address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on BaseScan <ArrowUpRight size={15} />
+                  </a>
+                  {snapshot?.market.pairAddress && (
+                    <a
+                      className="stocks-button stocks-button-primary"
+                      href={`https://dexscreener.com/base/${snapshot.market.pairAddress}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      DEX Screener <ArrowUpRight size={15} />
+                    </a>
+                  )}
+                </div>
                 {loading ? (
                   <p role="status">Loading market and onchain data…</p>
                 ) : error ? (
@@ -406,26 +426,6 @@ export function StocksPage() {
                     </p>
                   </>
                 ) : null}
-                <div className="stocks-external-actions" aria-label="External market sources">
-                  <a
-                    className="stocks-button stocks-button-primary"
-                    href={`https://basescan.org/token/${selected.address}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View on BaseScan <ArrowUpRight size={15} />
-                  </a>
-                  {snapshot?.market.pairAddress && (
-                    <a
-                      className="stocks-button stocks-button-primary"
-                      href={`https://dexscreener.com/base/${snapshot.market.pairAddress}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      DEX Screener <ArrowUpRight size={15} />
-                    </a>
-                  )}
-                </div>
               </section>
             </div>
             <section className="stocks-panel stocks-mechanics">
