@@ -1,15 +1,21 @@
 /* District infrastructure sits beneath the existing physical miniatures. */
 .stock-district-network { position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.85; }
 .stock-district .stock-stage { background:radial-gradient(ellipse at 18% 34%,#18303b,transparent 56%),radial-gradient(ellipse at 88% 62%,#29251e,transparent 48%),#080f16; }
+.stock-district .stock-stage::before { content:"";display:block;position:absolute;inset:-12%;z-index:0;pointer-events:none;background:linear-gradient(112deg,transparent 18%,#4cc8ff0b 35%,transparent 48%),linear-gradient(68deg,transparent 62%,#ffb45c08 73%,transparent 86%);filter:blur(20px);animation:district-haze 16s ease-in-out infinite alternate; }
+.stock-district .stock-stage::after { content:"";position:absolute;inset:0;z-index:4;pointer-events:none;background:radial-gradient(circle at 50% 48%,transparent 42%,#03080d52 100%),repeating-linear-gradient(0deg,transparent 0 4px,#bfeaff05 5px);mix-blend-mode:screen; }
 .district-heading { position:absolute;left:32px;top:104px;pointer-events:none;transition:opacity .3s; }
 .district-heading>span { color:#83b5d1;font:600 12px/1.5 Inter,sans-serif;letter-spacing:.19em; }
 .district-heading p { color:#d5e1e6;font:400 18px/1.5 Inter,sans-serif;margin:7px 0;letter-spacing:-.025em; }
+.district-sector { display:grid;grid-template-columns:9px auto;align-items:center;column-gap:8px;margin-top:15px;color:#7794a4;font:600 10px/1.4 Inter,sans-serif;letter-spacing:.13em;text-transform:uppercase; }
+.district-sector i { grid-row:1 / 3;width:7px;height:7px;border-radius:50%;background:#64d4ff;box-shadow:0 0 13px #24c8ff;animation:district-sector-pulse 1.9s ease-in-out infinite; }
+.district-sector strong { grid-column:2;color:#bcd4df;font-size:11px;letter-spacing:.07em;margin-top:2px; }
 .stock-district .stock-object-caption { border-top-color:#6899b342;transition:border-color .25s,filter .25s; }
 .stock-district .stock-voxel-exhibit:hover .stock-object-caption { border-color:#69caffaa;filter:drop-shadow(0 0 12px #0052ff44); }
 .stock-district .stock-voxel-exhibit:hover .stock-object-open { color:#91d8ff; }
-.stock-district .stock-report-dialog { inset:12px 12px 12px auto;margin:0;width:min(620px,48vw);height:calc(100dvh - 24px);border:1px solid #56849b66;border-radius:18px;background:#0b1219;box-shadow:-24px 0 90px #0006; }
-.stock-district .stock-report-dialog[open] { animation:district-panel-in .35s ease-out; }
-.stock-district .stock-report-dialog::backdrop { background:#030a1226;backdrop-filter:none; }
+.stock-district .stock-voxel-exhibit.is-active .stock-object-caption { border-color:#79d5ff;filter:drop-shadow(0 0 18px #178dff77); }
+.stock-district .stock-voxel-exhibit.is-active .stock-object-number,.stock-district .stock-voxel-exhibit.is-active .stock-object-open { color:#a9e6ff; }
+.stock-district .stock-report-dialog { position:fixed;inset:12px 12px 12px auto;z-index:80;display:flex;flex-direction:column;margin:0;width:min(620px,48vw);height:calc(100dvh - 24px);max-width:none;max-height:none;padding:0;overflow:hidden;border:1px solid #56849b66;border-radius:18px;background:#0b1219;color:#ececec;box-shadow:-24px 0 90px #0009;animation:district-panel-in .35s ease-out; }
+.stock-district.has-research::after { content:"";position:fixed;inset:0;z-index:70;pointer-events:none;background:linear-gradient(90deg,transparent 35%,#030a1238 62%,#030a1275); }
 .stock-district .stock-report-dialog header { padding:20px;font:500 14px/1.5 Inter,sans-serif;border-color:#6a8eaa33;background:#0d1924; }
 .stock-district .stock-report-dialog header button { min-width:36px;min-height:36px; }
 .district-report-context { display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #6a8eaa33;font:500 12px/1.5 Inter,sans-serif;color:#9db1c1; }
@@ -22,10 +28,12 @@
 [data-theme="light"] .district-heading>span { color:#275775; }
 [data-theme="light"] .district-heading p { color:#203239; }
 @keyframes district-panel-in { from { opacity:0;transform:translateX(32px); } to { opacity:1;transform:translateX(0); } }
+@keyframes district-haze { from { transform:translate3d(-1.5%,0,0) scale(1);opacity:.72; } to { transform:translate3d(1.5%,-1%,0) scale(1.04);opacity:1; } }
+@keyframes district-sector-pulse { 50% { transform:scale(1.45);box-shadow:0 0 22px #24c8ff; } }
 @media(max-width:900px) {
   .stock-district .stock-report-dialog { inset:auto 0 0;width:100%;height:86dvh;border-radius:18px 18px 0 0; }
-  .stock-district .stock-report-dialog::backdrop { background:#030a1266; }
+  .stock-district.has-research::after { background:#030a1266; }
   .district-heading { top:85px;left:20px; }
   .district-heading p { font-size:16px; }
 }
-@media(prefers-reduced-motion:reduce) { .stock-district .stock-report-dialog[open] { animation:none; }.district-heading,.stock-district .stock-object-caption { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .stock-district .stock-report-dialog,.stock-district .stock-stage::before,.district-sector i { animation:none; }.district-heading,.stock-district .stock-object-caption { transition:none; } }

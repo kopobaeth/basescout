@@ -18,6 +18,14 @@ import "./district.css";
 const W = 6000, H = 4200;
 const exhibits = STOCKS.map((stock, i) => ({ ...stock, x: 750 + i % 4 * 1450, y: 620 + Math.floor(i / 4) * 1050 }));
 const wrap = (n: number, size: number) => ((n % size) + size) % size;
+const nearestExhibit = (camera: { x: number; y: number }) => {
+  let nearest = 0, nearestDistance = Infinity;
+  exhibits.forEach((a, i) => {
+    const distance = Math.hypot(wrap(a.x - camera.x + W / 2, W) - W / 2, wrap(a.y - camera.y + H / 2, H) - H / 2);
+    if (distance < nearestDistance) { nearest = i; nearestDistance = distance; }
+  });
+  return nearest;
+};
 type Point = { x: number; y: number };
 const STOCK_INDEX_ICONS: LucideIcon[] = [
   MonitorSmartphone, PackageCheck, Landmark, CircleDollarSign, Database,
@@ -29,7 +37,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const world = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLCanvasElement>(null);
   const readout = useRef<HTMLSpanElement>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const sectorReadout = useRef<HTMLSpanElement>(null);
   const indexInput = useRef<HTMLInputElement>(null);
   const indexButton = useRef<HTMLButtonElement>(null);
   const userInteracted = useRef(false);
@@ -37,6 +45,8 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   const [indexOpen, setIndexOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
+  const selectedRef = useRef<number | null>(null);
+  selectedRef.current = selected;
   const [touched, setTouched] = useState(false);
   const [reportReady, setReportReady] = useState(false);
   const [webglReady, setWebglReady] = useState(false);
@@ -69,9 +79,15 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       c.tx=c.x+wrap(a.x-c.x+W/2,W)-W/2+panelWidth/(2*z);
       c.ty=c.y+wrap(a.y-c.y+H/2,H)-H/2+70;
       c.tz=Math.max(.32,z);c.vx=c.vy=0;
-      dialog.current?.showModal();
     }
-    else dialog.current?.close();
+  }, [selected]);
+  useEffect(() => {
+    if (selected === null) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setSelected(null); }
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
   }, [selected]);
   useEffect(() => { if (indexOpen) indexInput.current?.focus(); }, [indexOpen]);
   useEffect(() => {
@@ -146,6 +162,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       const c = cam.current, delta = 180 / c.tz;
       if (e.key.startsWith("Arrow")) { e.preventDefault(); setTouched(true); c.tx += e.key === "ArrowRight" ? delta : e.key === "ArrowLeft" ? -delta : 0; c.ty += e.key === "ArrowDown" ? delta : e.key === "ArrowUp" ? -delta : 0; }
       if (e.key === "+" || e.key === "=" || e.key === "-") { e.preventDefault(); zoom(el.clientWidth / 2, el.clientHeight / 2, e.key === "-" ? .8 : 1.25); }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(nearestExhibit(c)); }
     };
     const draw = (time: number) => {
       const dt = Math.min(.04, (time - previous) / 1000); previous = time;
@@ -158,10 +175,27 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       c.x -= wx; c.tx -= wx; c.y -= wy; c.ty -= wy;
       world.current!.style.transform = `translate3d(${el.clientWidth / 2 - c.x * c.z}px,${el.clientHeight / 2 - c.y * c.z}px,0) scale(${c.z})`;
       if (readout.current) readout.current.textContent = `${Math.round(c.x).toString().padStart(4,"0")} / ${Math.round(c.y).toString().padStart(4,"0")} — ${Math.round(c.z * 100)}%`;
+      const nearest = nearestExhibit(c);
+      const activeSector = selectedRef.current ?? nearest;
+      if (sectorReadout.current) sectorReadout.current.textContent = `${String(activeSector + 1).padStart(2,"0")} / ${exhibits[activeSector].name} · ${exhibits[activeSector].symbol.replace(/c$/, "")}`;
       const ctx = map.current?.getContext("2d");
       if (ctx) {
-        ctx.clearRect(0, 0, 180, 126); ctx.fillStyle = "#a0a0a6";
-        exhibits.forEach(a => ctx.fillRect(a.x / W * 180 - 2, a.y / H * 126 - 2, 4, 4));
+        ctx.clearRect(0, 0, 180, 126);
+        ctx.strokeStyle = isDark ? "#477b9455" : "#244a6055";
+        ctx.lineWidth = 1;
+        exhibits.forEach((a, i) => {
+          for (const j of [i % 4 < 3 ? i + 1 : -1, i + 4]) {
+            if (j < 0 || j >= exhibits.length) continue;
+            ctx.beginPath(); ctx.moveTo(a.x / W * 180, a.y / H * 126); ctx.lineTo(exhibits[j].x / W * 180, exhibits[j].y / H * 126); ctx.stroke();
+          }
+        });
+        exhibits.forEach((a, i) => {
+          const active = selectedRef.current === i || (selectedRef.current === null && nearest === i);
+          ctx.fillStyle = active ? "#70d7ff" : isDark ? "#91a8b3" : "#365765";
+          ctx.shadowColor = active ? "#2abfff" : "transparent"; ctx.shadowBlur = active ? 8 : 0;
+          ctx.beginPath(); ctx.arc(a.x / W * 180, a.y / H * 126, active ? 4 : 2.2, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.shadowBlur = 0;
         ctx.strokeStyle = "#0052ff";
         for (const x of [-W, 0, W]) for (const y of [-H, 0, H]) ctx.strokeRect((c.x + x - el.clientWidth / c.z / 2) / W * 180, (c.y + y - el.clientHeight / c.z / 2) / H * 126, el.clientWidth / c.z / W * 180, el.clientHeight / c.z / H * 126);
       }
@@ -173,14 +207,14 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   }, []);
 
   return <main className={`stocks-page stock-universe stock-voxel-universe stock-district${selected!==null?" has-research":""}`}>
-    <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Use Index for an accessible asset list.">
+    <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Press Enter or Space to research the active sector. Use Index for an accessible asset list.">
       {isDark && webglReady && <div className="stock-structure-flow" aria-hidden="true">
         <StructureFlowCollection variant="structure-flow" speed={1.00} pointSize={0.080} opacity={0.40} maskStart={0.20} maskSolid={0.50} />
       </div>}
-      <VoxelGallery camera={cam} dark={isDark} onWebGL={setWebglReady} />
+      <VoxelGallery camera={cam} dark={isDark} selected={selected} onWebGL={setWebglReady} />
       <div ref={world} className="stock-world">
         {[-1,0,1].flatMap(rx => [-1,0,1].map(ry => <div key={`${rx}-${ry}`} className="stock-world-tile" style={{left: rx * W, top: ry * H}} aria-hidden="true">
-          {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className="stock-voxel-exhibit" style={{left:a.x - OBJECT_WIDTH/2, top:a.y - OBJECT_HEIGHT/2}}>
+          {exhibits.map((a,i) => <div key={a.address} data-stock-index={i} className={`stock-voxel-exhibit${selected===i?" is-active":""}`} style={{left:a.x - OBJECT_WIDTH/2, top:a.y - OBJECT_HEIGHT/2}}>
             <div className="stock-object-caption"><span className="stock-object-number">{String(i+1).padStart(2,"0")} / 13</span><div><strong>{a.name}</strong><small>{a.symbol.replace(/c$/,"")} · B20</small></div><span className="stock-object-open">Research <ArrowUpRight size={24} /></span></div>
           </div>)}
         </div>))}
@@ -196,7 +230,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
         </div>
       </div>
     </header>
-    <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p></div>
+    <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p><div className="district-sector"><i aria-hidden="true" /><span>Active sector</span><strong ref={sectorReadout}>01 / Apple · AAPL</strong></div></div>
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
     {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
@@ -209,8 +243,8 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       })}</div>
       <p>Explore the canvas, or open a report directly.</p>
     </aside>}
-    <dialog ref={dialog} aria-label="Stock research report" className="stock-report-dialog" onCancel={() => setSelected(null)} onClose={() => {setSelected(null);indexButton.current?.focus();}}>
-      {selected !== null && <><header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><button onClick={() => setSelected(null)}>Close</button></div></header><div className="district-report-context"><span>B20 · {exhibits[selected].symbol}</span><a href={stockPath(exhibits[selected].address)} target="_blank" rel="noreferrer">Full report <ArrowUpRight size={14} /></a></div>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} /></>}
-    </dialog>
+    {selected !== null && <aside role="dialog" aria-modal="true" aria-label="Stock research report" className="stock-report-dialog">
+      <header><span>{exhibits[selected].name} / Research</span><div><button aria-label="Previous stock" onClick={() => setSelected((selected + exhibits.length - 1) % exhibits.length)}>←</button><button aria-label="Next stock" onClick={() => setSelected((selected+1)%exhibits.length)}>→</button><button onClick={() => { setSelected(null); indexButton.current?.focus(); }}>Close</button></div></header><div className="district-report-context"><span>B20 · {exhibits[selected].symbol}</span><a href={stockPath(exhibits[selected].address)} target="_blank" rel="noreferrer">Full report <ArrowUpRight size={14} /></a></div>{!reportReady && <p className="stock-report-loading" role="status">Opening {exhibits[selected].name} research…</p>}<iframe key={selected} onLoad={() => setReportReady(true)} title={`${exhibits[selected].name} research report`} src={`${stockPath(exhibits[selected].address)}?embed=1`} />
+    </aside>}
   </main>;
 }
