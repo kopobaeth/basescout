@@ -18,6 +18,14 @@ import "./district.css";
 const W = 6000, H = 4200;
 const exhibits = STOCKS.map((stock, i) => ({ ...stock, x: 750 + i % 4 * 1450, y: 620 + Math.floor(i / 4) * 1050 }));
 const wrap = (n: number, size: number) => ((n % size) + size) % size;
+const nearestExhibit = (camera: { x: number; y: number }) => {
+  let nearest = 0, nearestDistance = Infinity;
+  exhibits.forEach((a, i) => {
+    const distance = Math.hypot(wrap(a.x - camera.x + W / 2, W) - W / 2, wrap(a.y - camera.y + H / 2, H) - H / 2);
+    if (distance < nearestDistance) { nearest = i; nearestDistance = distance; }
+  });
+  return nearest;
+};
 type Point = { x: number; y: number };
 const STOCK_INDEX_ICONS: LucideIcon[] = [
   MonitorSmartphone, PackageCheck, Landmark, CircleDollarSign, Database,
@@ -154,6 +162,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       const c = cam.current, delta = 180 / c.tz;
       if (e.key.startsWith("Arrow")) { e.preventDefault(); setTouched(true); c.tx += e.key === "ArrowRight" ? delta : e.key === "ArrowLeft" ? -delta : 0; c.ty += e.key === "ArrowDown" ? delta : e.key === "ArrowUp" ? -delta : 0; }
       if (e.key === "+" || e.key === "=" || e.key === "-") { e.preventDefault(); zoom(el.clientWidth / 2, el.clientHeight / 2, e.key === "-" ? .8 : 1.25); }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(nearestExhibit(c)); }
     };
     const draw = (time: number) => {
       const dt = Math.min(.04, (time - previous) / 1000); previous = time;
@@ -166,11 +175,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       c.x -= wx; c.tx -= wx; c.y -= wy; c.ty -= wy;
       world.current!.style.transform = `translate3d(${el.clientWidth / 2 - c.x * c.z}px,${el.clientHeight / 2 - c.y * c.z}px,0) scale(${c.z})`;
       if (readout.current) readout.current.textContent = `${Math.round(c.x).toString().padStart(4,"0")} / ${Math.round(c.y).toString().padStart(4,"0")} — ${Math.round(c.z * 100)}%`;
-      let nearest = 0, nearestDistance = Infinity;
-      exhibits.forEach((a, i) => {
-        const distance = Math.hypot(wrap(a.x - c.x + W / 2, W) - W / 2, wrap(a.y - c.y + H / 2, H) - H / 2);
-        if (distance < nearestDistance) { nearest = i; nearestDistance = distance; }
-      });
+      const nearest = nearestExhibit(c);
       const activeSector = selectedRef.current ?? nearest;
       if (sectorReadout.current) sectorReadout.current.textContent = `${String(activeSector + 1).padStart(2,"0")} / ${exhibits[activeSector].name} · ${exhibits[activeSector].symbol.replace(/c$/, "")}`;
       const ctx = map.current?.getContext("2d");
@@ -202,7 +207,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   }, []);
 
   return <main className={`stocks-page stock-universe stock-voxel-universe stock-district${selected!==null?" has-research":""}`}>
-    <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Use Index for an accessible asset list.">
+    <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Press Enter or Space to research the active sector. Use Index for an accessible asset list.">
       {isDark && webglReady && <div className="stock-structure-flow" aria-hidden="true">
         <StructureFlowCollection variant="structure-flow" speed={1.00} pointSize={0.080} opacity={0.40} maskStart={0.20} maskSolid={0.50} />
       </div>}
