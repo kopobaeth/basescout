@@ -1200,7 +1200,11 @@ function ScoutApp() {
 
         <div className="sidebar-footer">
           <details className="appearance-menu" ref={appearanceMenuRef}>
-            <summary className="appearance-trigger" title={`Appearance: ${themePreference}`}>
+            <summary
+              aria-label={`Appearance: ${themePreference}. Choose color theme`}
+              className="appearance-trigger"
+              title={`Appearance: ${themePreference}`}
+            >
               <SunMoon size={16} />
               <span>Appearance</span>
               <small>{themePreference}</small>
@@ -1254,7 +1258,7 @@ function ScoutApp() {
             <span>
               BaseScout / {activeWorkspacePanel === "saved" ? "Workspace" : activeWorkspacePanel ? "Analysis" : isTrendingPage ? "Markets" : "Research"}
             </span>
-            <h1>
+            <p className="workspace-heading">
               {activeWorkspacePanel === "saved"
                 ? "Saved Research"
                 : activeWorkspacePanel === "risk"
@@ -1262,13 +1266,13 @@ function ScoutApp() {
                   : activeWorkspacePanel === "security"
                     ? "Security Intelligence"
                     : isTrendingPage
-                      ? "Trending Base Pools"
+                      ? "Market Intelligence"
                       : "Token Intelligence"}
-            </h1>
+            </p>
           </div>
           <div className="workspace-header-meta">
             <span className="source-status"><i aria-hidden="true" /> DEX Screener + BaseScan</span>
-            <span className="network-pill"><span className="status-dot" /> Base mainnet</span>
+            <span className="network-pill"><span className="status-dot" aria-hidden="true" /> Base mainnet</span>
           </div>
         </header>
 
@@ -1641,8 +1645,8 @@ function ScoutApp() {
       )}
 
       <footer className="app-footer">
-        <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
-        <span>Not financial advice.</span>
+        <span>BaseScout is a first-pass research tool. Verify critical details independently.</span>
+        <span>Research only. Not financial advice.</span>
       </footer>
         </div>
       </section>
