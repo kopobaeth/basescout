@@ -75,10 +75,11 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
     networkContext?.setTransform(networkDpr,0,0,networkDpr,0,0);
     if(fallbackCanvas){const dpr=Math.min(window.devicePixelRatio,1.5);fallbackCanvas.width=Math.round(w*dpr);fallbackCanvas.height=Math.round(h*dpr);ctx?.setTransform(dpr,0,0,dpr,0,0);}
   }
-  function render(view:GalleryCamera,w:number,h:number,dark:boolean,hover:number,lean:number) {
+  function render(view:GalleryCamera,w:number,h:number,dark:boolean,hover:number,lean:number,selected:number) {
     resize(w,h);
     const tick=reduced.matches?0:Math.floor(performance.now()/50);
-    const cameraSignature=[view.x.toFixed(2),view.y.toFixed(2),view.z.toFixed(4),dark,hover,lean.toFixed(3)].join('/');
+    const focus=selected>=0?selected:hover;
+    const cameraSignature=[view.x.toFixed(2),view.y.toFixed(2),view.z.toFixed(4),dark,hover,selected,lean.toFixed(3)].join('/');
     if(networkContext && (dirty||tick!==networkFrame||!last.startsWith(cameraSignature))) {
       networkFrame=tick;
       const n=networkContext;n.clearRect(0,0,w,h);
@@ -98,7 +99,7 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
           const y=h/2+(a.y+ry*WORLD_HEIGHT-view.y+175)*view.z;
           const bx=x+(b.x-a.x)*view.z,by=y+(b.y-a.y)*view.z;
           if(Math.max(x,bx)<-100||Math.min(x,bx)>w+100||Math.max(y,by)<-100||Math.min(y,by)>h+100)continue;
-          const active=hover===i||hover===j;
+          const active=focus===i||focus===j;
           n.strokeStyle=dark?(active?"#64caff80":"#3875a033"):(active?"#0052ff99":"#295d7738");
           n.lineWidth=active?1.5:1;n.beginPath();n.moveTo(x,y);n.lineTo(bx,by);n.stroke();
           const t=reduced.matches?.5:((tick*.005+i*.17)%1);
@@ -107,6 +108,29 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
           n.fillRect(x+(bx-x)*t-2,y+(by-y)*t-2,4,4);n.shadowBlur=0;
         }
       });
+      for(let rx=-1;rx<=1;rx++)for(let ry=-1;ry<=1;ry++)positions.forEach((a,i)=>{
+        const x=w/2+(a.x+rx*WORLD_WIDTH-view.x)*view.z;
+        const y=h/2+(a.y+ry*WORLD_HEIGHT-view.y+175)*view.z;
+        if(x<-30||x>w+30||y<-30||y>h+30)return;
+        const active=focus===i;
+        n.fillStyle=dark?(active?"#d5f5ff":"#5795ad"):(active?"#0052ff":"#54717e");
+        n.strokeStyle=dark?(active?"#4ed4ff":"#366477"):(active?"#0052ff":"#6b8792");
+        n.lineWidth=1;n.shadowColor=active?(dark?"#23c7ff":"#0052ff"):"transparent";n.shadowBlur=active?18:0;
+        n.beginPath();n.arc(x,y,active?5:2.5,0,Math.PI*2);n.fill();
+        n.beginPath();n.arc(x,y,active?12:6,0,Math.PI*2);n.stroke();n.shadowBlur=0;
+      });
+      if(focus>=0) for(let rx=-1;rx<=1;rx++)for(let ry=-1;ry<=1;ry++) {
+        const a=positions[focus];
+        const x=w/2+(a.x+rx*WORLD_WIDTH-view.x)*view.z;
+        const y=h/2+(a.y+ry*WORLD_HEIGHT-view.y+175)*view.z;
+        if(x<-160||x>w+160||y<-240||y>h+160)continue;
+        const pulse=reduced.matches?.55:.35+.2*Math.sin(tick*.2);
+        n.strokeStyle=dark?`rgba(81,205,255,${pulse})`:`rgba(0,82,255,${pulse})`;
+        n.lineWidth=1.5;n.shadowColor=dark?"#24c8ff":"#0052ff";n.shadowBlur=18;
+        n.beginPath();n.ellipse(x,y,Math.max(28,220*view.z),Math.max(8,48*view.z),0,0,Math.PI*2);n.stroke();
+        n.beginPath();n.moveTo(x,y);n.lineTo(x,y-Math.max(80,260*view.z));n.stroke();
+        n.fillStyle=dark?"#b6eeff":"#0052ff";n.beginPath();n.arc(x,y-Math.max(80,260*view.z),3.5,0,Math.PI*2);n.fill();n.shadowBlur=0;
+      }
     }
     hoverStrength=reduced.matches?0:hoverStrength+((hover>=0?1:0)-hoverStrength)*.12;
     const signature=cameraSignature+"/"+hoverStrength.toFixed(2);
@@ -122,9 +146,9 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
       if(gl) {
         const item=sceneFor(i);
         item.group.rotation.y=hover===i?lean*.22:0;
-        item.group.position.y=hover===i?hoverStrength*.35:0;
-        item.group.scale.setScalar(hover===i?1+hoverStrength*.035:1);
-        item.key.intensity=dark?(hover===i?3.6:3.1):3.1;
+        item.group.position.y=focus===i?Math.max(hoverStrength,.55)*.35:0;
+        item.group.scale.setScalar(focus===i?1+Math.max(hoverStrength,.55)*.035:1);
+        item.key.intensity=dark?(focus===i?3.75:3.1):focus===i?3.45:3.1;
         item.fill.intensity=dark ? .9 : 1.3;
         const left=Math.max(0,x),bottom=Math.max(0,height-y-vh);
         gl.setViewport(x,height-y-vh,vw,vh);
@@ -132,8 +156,9 @@ export function createVoxelGalleryRenderer(canvas: HTMLCanvasElement) {
         gl.render(item.scene,camera);
       } else if(ctx) {
         if(!sprites.has(i))sprites.set(i,renderModelFallback(model(i)));
-        const lift=hover===i?hoverStrength*7*view.z:0;
-        const scale=hover===i?1+hoverStrength*.035:1;
+        const strength=focus===i?Math.max(hoverStrength,.55):0;
+        const lift=strength*7*view.z;
+        const scale=1+strength*.035;
         ctx.drawImage(sprites.get(i)!,x-vw*(scale-1)/2,y-vh*(scale-1)/2-lift,vw*scale,vh*scale);
       }
     });

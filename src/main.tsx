@@ -2,10 +2,17 @@ import { findStock, stockPath } from "./features/stocks/catalog";
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
+import "@fontsource/inter-tight/latin-400.css";
+import "@fontsource/inter-tight/latin-500.css";
+import "@fontsource/inter-tight/latin-600.css";
+import "@fontsource/inter-tight/latin-700.css";
 import "@fontsource/inter/latin-400.css";
 import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import "@fontsource/inter/latin-700.css";
+import "@fontsource/roboto-mono/latin-400.css";
+import "@fontsource/roboto-mono/latin-500.css";
+import "@fontsource/roboto-mono/latin-600.css";
 import {
   Activity,
   AlertTriangle,
@@ -71,6 +78,7 @@ import { isEvmAddress, isTokenContractAddress } from "./tokenAddress";
 import { loadTrendingPools } from "./trendingClient";
 import { applyThemePreference, readThemePreference, type ThemePreference } from "./theme";
 import "./styles.css";
+import "./base-brand.css";
 import type {
   BaseScanIntelligence,
   BaseScanStatus,
@@ -1107,7 +1115,7 @@ function ScoutApp() {
           </span>
           <span className="brand-copy">
             <strong>BaseScout</strong>
-            <small>Onchain intelligence</small>
+            <small>Research on Base</small>
           </span>
         </a>
 
@@ -1192,7 +1200,11 @@ function ScoutApp() {
 
         <div className="sidebar-footer">
           <details className="appearance-menu" ref={appearanceMenuRef}>
-            <summary className="appearance-trigger" title={`Appearance: ${themePreference}`}>
+            <summary
+              aria-label={`Appearance: ${themePreference}. Choose color theme`}
+              className="appearance-trigger"
+              title={`Appearance: ${themePreference}`}
+            >
               <SunMoon size={16} />
               <span>Appearance</span>
               <small>{themePreference}</small>
@@ -1246,7 +1258,7 @@ function ScoutApp() {
             <span>
               BaseScout / {activeWorkspacePanel === "saved" ? "Workspace" : activeWorkspacePanel ? "Analysis" : isTrendingPage ? "Markets" : "Research"}
             </span>
-            <h1>
+            <p className="workspace-heading">
               {activeWorkspacePanel === "saved"
                 ? "Saved Research"
                 : activeWorkspacePanel === "risk"
@@ -1254,13 +1266,13 @@ function ScoutApp() {
                   : activeWorkspacePanel === "security"
                     ? "Security Intelligence"
                     : isTrendingPage
-                      ? "Trending Base Pools"
+                      ? "Market Intelligence"
                       : "Token Intelligence"}
-            </h1>
+            </p>
           </div>
           <div className="workspace-header-meta">
             <span className="source-status"><i aria-hidden="true" /> DEX Screener + BaseScan</span>
-            <span className="network-pill"><span className="status-dot" /> Base mainnet</span>
+            <span className="network-pill"><span className="status-dot" aria-hidden="true" /> Base mainnet</span>
           </div>
         </header>
 
@@ -1337,9 +1349,9 @@ function ScoutApp() {
       <section className="hero" id="scanner">
         <span className="hero-hands" aria-hidden="true" />
         <div className="hero-copy">
-          <h1>Scan the token. <span>Read the risk.</span> Then decide.</h1>
+          <h1>Know the token <span>before you interact.</span></h1>
           <p className="hero-lede">
-            Liquidity, contract signals, and transparent scoring in one research surface.
+            Check liquidity, contract signals, and data confidence for tokens on Base.
           </p>
         </div>
 
@@ -1633,8 +1645,8 @@ function ScoutApp() {
       )}
 
       <footer className="app-footer">
-        <span>BaseScout is a first-pass risk scanner. Always DYOR.</span>
-        <span>Not financial advice.</span>
+        <span>BaseScout is a first-pass research tool. Verify critical details independently.</span>
+        <span>Research only. Not financial advice.</span>
       </footer>
         </div>
       </section>
@@ -2131,7 +2143,7 @@ function TrendingPage({
         <div>
           <p className="section-kicker">Trending by market activity</p>
           <h1>Trending Base Pools</h1>
-          <p>Pools currently trending by market activity and GeckoTerminal signals.</p>
+          <p>See which Base pools are getting attention, then inspect the tokens behind them.</p>
         </div>
         <div className="trending-meta">
           <span>{data?.updatedAt ? `Last updated ${historyTimestampText(data.updatedAt)}` : "Last updated unavailable"}</span>

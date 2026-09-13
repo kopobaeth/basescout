@@ -1,0 +1,732 @@
+/*
+ * BaseScout product language, informed by the Base brand starter kit.
+ * BasePaint deliberately owns its own isolated `.bp-*` visual system.
+ */
+:root {
+  --base-blue: #0000ff;
+  --base-blue-hover: #2424ff;
+  --base-black: #0a0b0d;
+  --base-white: #ffffff;
+  --base-gray-10: #eef0f3;
+  --base-gray-15: #dee1e7;
+  --base-gray-30: #b1b7c3;
+  --base-gray-50: #717886;
+  --base-gray-60: #5b616e;
+  --base-gray-80: #32353d;
+  --base-cerulean: #3c8aff;
+  --base-tan: #b8a581;
+  --base-yellow: #ffd12f;
+  --base-green: #66c800;
+  --base-lime: #b6f569;
+  --base-red: #fc401f;
+  --base-pink: #fea8cd;
+  --brand-sans: "Inter Tight", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --brand-mono: "Roboto Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --brand-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --brand-fast: 160ms;
+
+  font-family: var(--brand-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--base-white);
+  background: var(--base-black);
+  --ink: var(--base-white);
+  --muted: var(--base-gray-30);
+  --line: var(--base-gray-80);
+  --panel: var(--base-black);
+  --soft: var(--base-gray-80);
+  --surface-base: var(--base-black);
+  --surface-raised: #111216;
+  --surface-muted: #191b20;
+  --surface-hover: #24262d;
+  --text-subtle: var(--base-gray-50);
+  --focus-ring: var(--base-blue);
+  --vantage-text-primary: var(--base-white);
+  --vantage-text-secondary: var(--base-gray-30);
+  --vantage-text-tertiary: var(--base-gray-50);
+  /* Keep decorative accents neutral; Base Blue is reserved for primary actions. */
+  --vantage-accent: var(--base-gray-30);
+  --vantage-surface-base: var(--base-black);
+  --vantage-surface-raised: #111216;
+  --vantage-surface-muted: #191b20;
+  --vantage-border: var(--base-gray-80);
+  --vantage-radius-sm: 6px;
+  --vantage-radius-md: 8px;
+  --app-sidebar: var(--base-black);
+  --app-header: var(--base-black);
+  --app-control: #17191e;
+  --app-control-hover: #23262c;
+  --app-input: var(--base-black);
+  --app-input-border: var(--base-gray-60);
+  --app-hover-border: var(--base-gray-50);
+  --app-card-glint: transparent;
+  --app-grid-line: var(--base-gray-80);
+  --app-shadow: transparent;
+  --app-shadow-strong: rgb(0 0 0 / 0.48);
+  --app-body-blue-glow: transparent;
+  --app-body-cyan-glow: transparent;
+  --app-hero-blue-glow: transparent;
+  --app-active-text: var(--base-white);
+  --app-icon-color: var(--base-white);
+  --app-icon-surface: var(--base-gray-80);
+  --app-icon-border: var(--base-gray-80);
+}
+
+html[data-theme="light"] {
+  color: var(--base-black);
+  background: var(--base-white);
+  --ink: var(--base-black);
+  --muted: var(--base-gray-60);
+  --line: var(--base-gray-15);
+  --panel: var(--base-white);
+  --soft: var(--base-gray-10);
+  --surface-base: var(--base-white);
+  --surface-raised: var(--base-white);
+  --surface-muted: var(--base-gray-10);
+  --surface-hover: var(--base-gray-15);
+  --text-subtle: var(--base-gray-50);
+  --focus-ring: var(--base-blue);
+  --vantage-text-primary: var(--base-black);
+  --vantage-text-secondary: var(--base-gray-60);
+  --vantage-text-tertiary: var(--base-gray-50);
+  --vantage-accent: var(--base-gray-60);
+  --vantage-surface-base: var(--base-white);
+  --vantage-surface-raised: var(--base-white);
+  --vantage-surface-muted: var(--base-gray-10);
+  --vantage-border: var(--base-gray-15);
+  --app-sidebar: var(--base-white);
+  --app-header: var(--base-white);
+  --app-control: var(--base-gray-10);
+  --app-control-hover: var(--base-gray-15);
+  --app-input: var(--base-white);
+  --app-input-border: var(--base-gray-30);
+  --app-hover-border: var(--base-gray-50);
+  --app-shadow: transparent;
+  --app-shadow-strong: rgb(10 11 13 / 0.16);
+  --app-active-text: var(--base-blue);
+  --app-icon-color: var(--base-black);
+  --app-icon-surface: var(--base-gray-10);
+  --app-icon-border: var(--base-gray-15);
+  --app-scrim: rgb(10 11 13 / 0.42);
+}
+
+body:has(.app-frame),
+body:has(.stocks-page) {
+  color: var(--vantage-text-primary);
+  background: var(--vantage-surface-base);
+  background-image: none;
+  font-family: var(--brand-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  font-feature-settings: "liga" 0, "tnum" 1;
+}
+
+.app-frame {
+  gap: 8px;
+  width: min(1600px, calc(100% - 16px));
+  padding: 8px 0 24px;
+  transition: grid-template-columns 220ms var(--brand-ease);
+}
+
+.app-sidebar,
+.workspace-header {
+  top: 8px;
+  background: var(--vantage-surface-base);
+  border-color: var(--vantage-border);
+  border-radius: 8px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.app-sidebar {
+  height: calc(100vh - 16px);
+  padding: 8px;
+}
+
+.sidebar-brand {
+  min-height: 54px;
+  padding: 5px 6px 13px;
+}
+
+.sidebar-brand .brand-mark {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  padding: 2px;
+  background: var(--base-blue);
+  border: 0;
+  border-radius: 5%;
+  box-shadow: none;
+}
+
+.sidebar-brand .brand-copy strong {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.sidebar-brand .brand-copy small,
+.sidebar-group > p,
+.workspace-title > span,
+.section-kicker,
+.eyebrow,
+.source-status,
+.network-pill,
+.app-footer,
+.scan-action-identity small,
+.trending-meta,
+.trending-tokens small,
+.trending-metrics,
+.market-metrics,
+.snapshot-list,
+.score-ring span {
+  font-family: var(--brand-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-brand .brand-copy small {
+  color: var(--vantage-text-tertiary);
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.sidebar-nav {
+  gap: 20px;
+  padding: 18px 0;
+}
+
+/* These regions scroll vertically; a hover transform must not create an x-axis bar. */
+.app-frame :where(.sidebar-nav, .security-list, .score-breakdown, .watchlist-list, .recent-list) {
+  overflow-x: hidden;
+}
+
+.sidebar-group > p {
+  margin-inline: 9px;
+  color: var(--vantage-text-tertiary);
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.045em;
+}
+
+.sidebar-link {
+  min-height: 42px;
+  padding-inline: 10px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: color var(--brand-fast) var(--brand-ease), background var(--brand-fast) var(--brand-ease), border-color var(--brand-fast) var(--brand-ease), transform var(--brand-fast) var(--brand-ease);
+}
+
+.sidebar-link:hover {
+  transform: translateX(2px);
+}
+
+.sidebar-link.active {
+  color: var(--base-white);
+  background: var(--base-blue);
+  border-color: var(--base-blue);
+  box-shadow: none;
+}
+
+.sidebar-link.active svg {
+  color: currentColor;
+}
+
+.sidebar-link b,
+.sidebar-link .sidebar-new-badge {
+  border-radius: 4px;
+  box-shadow: none;
+  font-family: var(--brand-mono);
+}
+
+.sidebar-link .sidebar-new-badge {
+  color: var(--base-blue);
+  background: var(--base-white);
+  border-color: var(--base-blue);
+}
+
+.basepaint-sidebar-link {
+  color: var(--base-yellow);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--base-yellow) 30%, var(--vantage-border));
+}
+
+.basepaint-sidebar-link:hover {
+  color: var(--base-black);
+  background: var(--base-yellow);
+  border-color: var(--base-yellow);
+}
+
+html[data-theme="light"] .basepaint-sidebar-link {
+  color: var(--base-black);
+  background: color-mix(in srgb, var(--base-yellow) 35%, var(--base-white));
+  border-color: var(--base-yellow);
+}
+
+.sidebar-footer > a,
+.appearance-trigger,
+.appearance-popover {
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.workspace-header {
+  min-height: 68px;
+  padding: 10px 14px;
+}
+
+.sidebar-toggle,
+.analysis-view-head > a,
+.scan-action-button,
+.scan-more-actions > summary,
+.recent-clear,
+.watchlist-actions button,
+.snapshot-action,
+.market-link,
+.trending-state button {
+  border-radius: 5px;
+  transition: color var(--brand-fast) var(--brand-ease), background var(--brand-fast) var(--brand-ease), border-color var(--brand-fast) var(--brand-ease), transform var(--brand-fast) var(--brand-ease);
+}
+
+.workspace-title > span {
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.035em;
+}
+
+.workspace-title .workspace-heading {
+  overflow: hidden;
+  margin: 0;
+  color: var(--vantage-text-primary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-status,
+.workspace-header .network-pill {
+  min-height: 32px;
+  border-radius: 4px;
+  font-size: 0.66rem;
+  font-weight: 500;
+}
+
+.source-status i,
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--base-green);
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.workspace-content {
+  padding-top: 8px;
+}
+
+.hero,
+.trending-hero,
+.analysis-view-head {
+  position: relative;
+  overflow: hidden;
+  color: var(--vantage-text-primary);
+  background: var(--vantage-surface-raised);
+  background-image: none;
+  border: 1px solid var(--vantage-border);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.hero::before,
+.trending-hero::before,
+.analysis-view-head::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 24px;
+  right: 24px;
+  left: auto;
+  display: block;
+  width: 14px;
+  height: 14px;
+  background: var(--vantage-border);
+  background-image: none;
+  border-radius: 5%;
+  opacity: 1;
+}
+
+.hero::after,
+.trending-hero::after {
+  display: none;
+}
+
+.hero {
+  min-height: 360px;
+  padding: 32px;
+}
+
+.hero > .hero-hands {
+  opacity: 0.18;
+  filter: grayscale(1) contrast(1.15);
+  mix-blend-mode: normal;
+}
+
+html[data-theme="light"] .hero > .hero-hands {
+  opacity: 0.09;
+  filter: grayscale(1) contrast(1.1);
+  mix-blend-mode: multiply;
+}
+
+.hero h1,
+.trending-hero h1,
+.analysis-view-head h2 {
+  font-family: var(--brand-sans);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.hero h1 {
+  max-width: 670px;
+  font-size: clamp(2.4rem, 4.5vw, 4.25rem);
+}
+
+.hero h1 span,
+html[data-theme="light"] .hero h1 span {
+  color: var(--vantage-accent);
+  text-shadow: none;
+}
+
+.hero-lede,
+.trending-hero p:not(.section-kicker),
+.analysis-view-head > div > span {
+  color: var(--vantage-text-secondary);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.section-kicker,
+.eyebrow {
+  color: var(--vantage-text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.scanner {
+  padding: 18px;
+  background: var(--vantage-surface-muted);
+  border-color: var(--vantage-border);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.scanner label {
+  color: var(--vantage-text-primary);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.input-shell {
+  min-height: 48px;
+  color: var(--vantage-text-secondary);
+  background: var(--app-input);
+  border-color: var(--app-input-border);
+  border-radius: 5px;
+}
+
+.input-shell:focus-within {
+  border-color: var(--base-blue);
+  box-shadow: 0 0 0 2px var(--base-blue);
+}
+
+.input-shell input,
+.scan-action-identity small,
+.mono,
+.stocks-address {
+  font-family: var(--brand-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.scanner button,
+.trending-state button,
+.scan-action-button.primary {
+  color: var(--base-white);
+  background: var(--base-blue);
+  border: 1px solid var(--base-blue);
+  border-radius: 5px;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.scanner button:not(:disabled):hover,
+.trending-state button:hover,
+.scan-action-button.primary:hover {
+  color: var(--base-white);
+  background: var(--base-blue-hover);
+  border-color: var(--base-blue-hover);
+  transform: translateY(-1px);
+}
+
+.scanner .example-token {
+  color: var(--vantage-text-secondary);
+  background: var(--vantage-surface-raised);
+  border-color: var(--vantage-border);
+  border-radius: 4px;
+  font-family: var(--brand-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.scanner .example-token:not(:disabled):hover,
+.scanner .example-token.active,
+html[data-theme="light"] .scanner .example-token:not(:disabled):hover,
+html[data-theme="light"] .scanner .example-token.active {
+  color: var(--base-white);
+  background: var(--base-blue);
+  border-color: var(--base-blue);
+}
+
+.scan-action-bar,
+.risk-card,
+.panel,
+.metric,
+.recent-scan,
+.recent-empty,
+.watchlist-item,
+.trending-pool,
+.market-row,
+.risk-copy,
+.score-bucket,
+.score-reason,
+.analysis-state,
+.security-check,
+.security-disclaimer,
+.intel-note,
+.snapshot-action,
+.empty-state,
+.workspace-secondary .watchlist-section,
+.workspace-secondary .recent-scans {
+  background: var(--vantage-surface-raised);
+  background-image: none;
+  border-color: var(--vantage-border);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.scan-action-bar,
+.dashboard,
+.markets-panel,
+.detail-grid,
+.trending-page,
+.workspace-secondary {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.metric,
+.panel,
+.risk-card {
+  transition: background var(--brand-fast) var(--brand-ease), border-color var(--brand-fast) var(--brand-ease), transform var(--brand-fast) var(--brand-ease);
+}
+
+.metric:hover,
+.trending-pool:hover,
+.recent-scan:not(:disabled):hover,
+.watchlist-item:hover {
+  background: var(--vantage-surface-muted);
+  border-color: var(--vantage-text-tertiary);
+  transform: translateY(-1px);
+}
+
+.metric-icon,
+.recent-logo,
+.trending-rank,
+.scan-token-symbol {
+  color: var(--app-icon-color);
+  background: var(--app-icon-surface);
+  border-color: var(--app-icon-border);
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.card-heading > svg,
+.panel-head > svg,
+.analysis-state > svg,
+.intel-note > svg,
+.empty-state > svg,
+.trending-state > svg {
+  color: var(--vantage-text-tertiary);
+}
+
+.metric span,
+.trending-metrics dt,
+.market-metrics dt,
+.snapshot-list dt {
+  font-family: var(--brand-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.metric strong,
+.market-metrics dd,
+.trending-metrics dd,
+.snapshot-list dd {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.score-ring,
+html[data-theme="light"] .score-ring {
+  background: radial-gradient(circle, var(--vantage-surface-raised) 58%, transparent 60%), conic-gradient(var(--score-color) var(--score), var(--vantage-border) var(--score));
+}
+
+.score-ring.loading-ring,
+html[data-theme="light"] .score-ring.loading-ring {
+  background: radial-gradient(circle, var(--vantage-surface-raised) 58%, transparent 60%), conic-gradient(var(--vantage-text-tertiary) 105deg, var(--vantage-border) 105deg);
+}
+
+.skeleton-line,
+html[data-theme="light"] .skeleton-line,
+html[data-theme="light"] .metric strong .skeleton-line {
+  background: var(--vantage-border);
+  border-radius: 2px;
+  animation: base-pulse 1.1s var(--brand-ease) infinite alternate;
+}
+
+.market-badge,
+.security-provider,
+.stocks-badge {
+  border-radius: 4px;
+}
+
+.market-badge.primary {
+  color: var(--vantage-accent);
+  background: var(--vantage-surface-muted);
+  border-color: var(--vantage-border);
+}
+
+/* Hide the document scrollbar on the research workspace while preserving wheel/touch scrolling. */
+html:has(.app-frame),
+body:has(.app-frame) {
+  scrollbar-width: none;
+}
+
+html:has(.app-frame)::-webkit-scrollbar,
+body:has(.app-frame)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.market-badge.warning,
+.security-provider.partial {
+  color: var(--base-yellow);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--base-yellow) 45%, var(--vantage-border));
+}
+
+.market-badge.danger,
+.security-provider.unavailable,
+.trending-state.error-state svg {
+  color: var(--base-red);
+}
+
+.security-provider.available {
+  color: var(--base-green);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--base-green) 45%, var(--vantage-border));
+}
+
+html[data-theme="light"] .market-badge.warning,
+html[data-theme="light"] .security-provider.partial,
+html[data-theme="light"] .market-badge.danger,
+html[data-theme="light"] .security-provider.unavailable,
+html[data-theme="light"] .security-provider.available {
+  background: var(--base-white);
+}
+
+.app-frame :where(a, button, input, select, summary):focus-visible {
+  outline: 2px solid var(--base-blue);
+  outline-offset: 2px;
+}
+
+.app-footer {
+  font-size: 0.68rem;
+  font-weight: 400;
+}
+
+@keyframes base-pulse {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-frame *,
+  .app-frame *::before,
+  .app-frame *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace-title .workspace-heading {
+    font-size: 0.92rem;
+  }
+
+  .hero {
+    min-height: 0;
+    padding: 24px;
+  }
+
+  .hero::before,
+  .trending-hero::before,
+  .analysis-view-head::before {
+    top: 18px;
+    right: 18px;
+    width: 11px;
+    height: 11px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.25rem, 13vw, 3.5rem);
+  }
+}
+
+@media (max-width: 1100px) {
+  .hero {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .trending-pool {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .trending-metrics,
+  .trending-actions {
+    grid-column: 1 / -1;
+  }
+
+  .trending-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (hover: none) {
+  .metric:hover,
+  .trending-pool:hover,
+  .recent-scan:not(:disabled):hover,
+  .watchlist-item:hover {
+    transform: none;
+  }
+}
