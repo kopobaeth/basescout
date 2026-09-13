@@ -551,6 +551,15 @@ html[data-theme="light"] .scanner .example-token.active {
   box-shadow: none;
 }
 
+.card-heading > svg,
+.panel-head > svg,
+.analysis-state > svg,
+.intel-note > svg,
+.empty-state > svg,
+.trending-state > svg {
+  color: var(--vantage-text-tertiary);
+}
+
 .metric span,
 .trending-metrics dt,
 .market-metrics dt,
