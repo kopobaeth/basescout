@@ -43,8 +43,8 @@
   --vantage-text-primary: var(--base-white);
   --vantage-text-secondary: var(--base-gray-30);
   --vantage-text-tertiary: var(--base-gray-50);
-  /* Cerulean is the accessible text accent on black; Base Blue stays the action color. */
-  --vantage-accent: var(--base-cerulean);
+  /* Keep decorative accents neutral; Base Blue is reserved for primary actions. */
+  --vantage-accent: var(--base-gray-30);
   --vantage-surface-base: var(--base-black);
   --vantage-surface-raised: #111216;
   --vantage-surface-muted: #191b20;
@@ -67,8 +67,8 @@
   --app-hero-blue-glow: transparent;
   --app-active-text: var(--base-white);
   --app-icon-color: var(--base-white);
-  --app-icon-surface: var(--base-blue);
-  --app-icon-border: var(--base-blue);
+  --app-icon-surface: var(--base-gray-80);
+  --app-icon-border: var(--base-gray-80);
 }
 
 html[data-theme="light"] {
@@ -88,7 +88,7 @@ html[data-theme="light"] {
   --vantage-text-primary: var(--base-black);
   --vantage-text-secondary: var(--base-gray-60);
   --vantage-text-tertiary: var(--base-gray-50);
-  --vantage-accent: var(--base-blue);
+  --vantage-accent: var(--base-gray-60);
   --vantage-surface-base: var(--base-white);
   --vantage-surface-raised: var(--base-white);
   --vantage-surface-muted: var(--base-gray-10);
@@ -103,9 +103,9 @@ html[data-theme="light"] {
   --app-shadow: transparent;
   --app-shadow-strong: rgb(10 11 13 / 0.16);
   --app-active-text: var(--base-blue);
-  --app-icon-color: var(--base-white);
-  --app-icon-surface: var(--base-blue);
-  --app-icon-border: var(--base-blue);
+  --app-icon-color: var(--base-black);
+  --app-icon-surface: var(--base-gray-10);
+  --app-icon-border: var(--base-gray-15);
   --app-scrim: rgb(10 11 13 / 0.42);
 }
 
@@ -347,7 +347,7 @@ html[data-theme="light"] .basepaint-sidebar-link {
   display: block;
   width: 14px;
   height: 14px;
-  background: var(--base-blue);
+  background: var(--vantage-border);
   background-image: none;
   border-radius: 5%;
   opacity: 1;
@@ -544,9 +544,9 @@ html[data-theme="light"] .scanner .example-token.active {
 .recent-logo,
 .trending-rank,
 .scan-token-symbol {
-  color: var(--base-white);
-  background: var(--base-blue);
-  border-color: var(--base-blue);
+  color: var(--app-icon-color);
+  background: var(--app-icon-surface);
+  border-color: var(--app-icon-border);
   border-radius: 4px;
   box-shadow: none;
 }
@@ -575,7 +575,7 @@ html[data-theme="light"] .score-ring {
 
 .score-ring.loading-ring,
 html[data-theme="light"] .score-ring.loading-ring {
-  background: radial-gradient(circle, var(--vantage-surface-raised) 58%, transparent 60%), conic-gradient(var(--base-blue) 105deg, var(--vantage-border) 105deg);
+  background: radial-gradient(circle, var(--vantage-surface-raised) 58%, transparent 60%), conic-gradient(var(--vantage-text-tertiary) 105deg, var(--vantage-border) 105deg);
 }
 
 .skeleton-line,
@@ -594,8 +594,20 @@ html[data-theme="light"] .metric strong .skeleton-line {
 
 .market-badge.primary {
   color: var(--vantage-accent);
-  background: color-mix(in srgb, var(--base-blue) 8%, var(--vantage-surface-raised));
-  border-color: color-mix(in srgb, var(--base-blue) 40%, var(--vantage-border));
+  background: var(--vantage-surface-muted);
+  border-color: var(--vantage-border);
+}
+
+/* Hide the document scrollbar on the research workspace while preserving wheel/touch scrolling. */
+html:has(.app-frame),
+body:has(.app-frame) {
+  scrollbar-width: none;
+}
+
+html:has(.app-frame)::-webkit-scrollbar,
+body:has(.app-frame)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .market-badge.warning,
