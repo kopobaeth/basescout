@@ -9,10 +9,10 @@
 .stock-voxel-canvas[hidden] { display:none; }
 .stock-voxel-exhibit { position:absolute;width:840px;height:740px;user-select:none; }
 .stock-object-caption { position:absolute;top:620px;left:94px;right:94px;display:flex;align-items:center;gap:25px;padding:22px 0;border-top:1px solid #a2b5b730; }
-.stock-object-number { align-self:flex-start;margin-top:6px;color:#87a1a7;font:500 18px/1.5 Inter,sans-serif;letter-spacing:.12em; }
-.stock-object-caption strong { display:block;font:560 38px/1.2 Inter,sans-serif;letter-spacing:-1.15px;color:#e4e8e3; }
-.stock-object-caption small { display:block;margin-top:8px;font:500 18px/1.4 Inter,sans-serif;letter-spacing:.13em;color:#8a9e9f; }
-.stock-object-open { display:flex;align-items:center;gap:8px;margin-left:auto;font:500 20px/1.4 Inter,sans-serif;color:#bfc9c5;opacity:.65;transition:opacity 180ms,color 180ms; }
+.stock-object-number { align-self:flex-start;margin-top:6px;color:#87a1a7;font:500 18px/1.5 var(--brand-mono);letter-spacing:.12em; }
+.stock-object-caption strong { display:block;font:560 38px/1.2 var(--brand-sans);letter-spacing:-1.15px;color:#e4e8e3; }
+.stock-object-caption small { display:block;margin-top:8px;font:500 18px/1.4 var(--brand-mono);letter-spacing:.13em;color:#8a9e9f; }
+.stock-object-open { display:flex;align-items:center;gap:8px;margin-left:auto;font:500 20px/1.4 var(--brand-sans);color:#bfc9c5;opacity:.65;transition:opacity 180ms,color 180ms; }
 .stock-voxel-exhibit:hover .stock-object-open { opacity:1;color:#f1b67c; }
 .stock-voxel-exhibit:hover .stock-object-caption { border-color:#c59b6e66; }
 .stock-voxel-universe .stock-hud.stock-docs-header { background:linear-gradient(#0a1115 0 65%,transparent);padding-top:14px;padding-bottom:20px; }
@@ -21,7 +21,7 @@
 .stock-voxel-universe .stock-map canvas { background:#111b21bd;border-color:#6c8a903b; }
 .stock-voxel-universe .stock-docs-header .stock-directory-button { background:#0052ff;color:#fff;box-shadow:0 7px 24px #0052ff38; }
 .stock-voxel-universe .stock-docs-header .stock-directory-button:hover { background:#1b64ff;box-shadow:0 9px 30px #0052ff52; }
-.stock-voxel-universe .stock-hud-bottom > div:first-child { font:500 12px/1.55 Inter,system-ui,sans-serif;letter-spacing:.01em; }
+.stock-voxel-universe .stock-hud-bottom > div:first-child { font:500 12px/1.55 var(--brand-mono);letter-spacing:.01em; }
 .stock-voxel-universe .stock-hud-bottom p { margin:6px 0 4px;color:#aebbbc; }
 .stock-voxel-universe .stock-hud-bottom a { font-weight:600;font-size:12px;letter-spacing:.015em;color:#69a2ff; }
 [data-theme="light"] .stock-voxel-universe .stock-stage { background:radial-gradient(ellipse at 24% 30%,#e0e6e4,transparent 60%),#becaca; }

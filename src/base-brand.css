@@ -195,6 +195,11 @@ body:has(.stocks-page) {
   padding: 18px 0;
 }
 
+/* These regions scroll vertically; a hover transform must not create an x-axis bar. */
+.app-frame :where(.sidebar-nav, .security-list, .score-breakdown, .watchlist-list, .recent-list) {
+  overflow-x: hidden;
+}
+
 .sidebar-group > p {
   margin-inline: 9px;
   color: var(--vantage-text-tertiary);

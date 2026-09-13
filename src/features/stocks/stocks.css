@@ -198,7 +198,7 @@
 }
 .stocks-address {
   overflow-wrap: anywhere;
-  font-family: monospace;
+  font-family: var(--brand-mono);
   font-size: 11px;
   color: var(--muted);
 }
@@ -733,7 +733,7 @@
   align-items: center;
   gap: 5px;
   color: #69a2ff;
-  font: 600 12px/1.55 Inter, system-ui, sans-serif;
+  font: 600 12px/1.55 var(--brand-sans);
   letter-spacing: .015em;
 }
 
