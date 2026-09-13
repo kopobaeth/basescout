@@ -204,7 +204,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
   }, []);
 
   return <main className={`stocks-page stock-universe stock-voxel-universe stock-district${selected!==null?" has-research":""}`}>
-    <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Press Enter or Space to research the active sector. Use Index for an accessible asset list.">
+    <div ref={stage} className="stock-stage" tabIndex={0} aria-label="Infinite stocks gallery. Drag to pan, scroll to zoom, or use arrow keys and plus/minus. Press Enter or Space to research the active asset. Use the Stocks button for an accessible asset list.">
       {isDark && webglReady && <div className="stock-structure-flow" aria-hidden="true">
         <StructureFlowCollection variant="structure-flow" speed={1.00} pointSize={0.080} opacity={0.40} maskStart={0.20} maskSolid={0.50} />
       </div>}
@@ -221,7 +221,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
       <div className="stock-docs-top">
         <a href="/" className="stocks-brand"><span className="stock-uploaded-logo"><img src="/basescout-logo-v2.webp" alt="" /></span><span className="stocks-brand-name">BaseScout</span></a>
         <div className="stock-docs-actions">
-          <nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending</a><a href="/basepaint">BasePaint</a></nav>
+          <nav aria-label="Research navigation"><a href="/">Token scanner</a><a href="/trending">Trending pools</a><a href="/basepaint">BasePaint</a></nav>
           <button className="stock-directory-button" ref={indexButton} onClick={() => setIndexOpen(true)}>Stocks <ArrowUpRight size={15} aria-hidden="true" /></button>
           <button className="stock-theme-button" aria-label={`Switch to ${isDark ? "light" : "dark"} theme`} title={`Switch to ${isDark ? "light" : "dark"} theme`} onClick={() => onThemeChange(isDark ? "light" : "dark")}>{isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}</button>
         </div>
@@ -230,7 +230,7 @@ export default function StocksCanvas({ theme, onThemeChange }: { theme: ThemePre
     <div className="district-heading"><span>B20 / RESEARCH DISTRICT</span><p>13 assets. One connected world.</p></div>
     {!touched && <p className="stock-drift-hint">Drag to explore · Scroll or pinch to zoom · Select an asset to research</p>}
     <footer className="stock-hud-bottom"><div><span ref={readout} /><p>Research only · No trading</p><a href="https://docs.base.org/specifications/b20/tokenized-stocks-on-base" target="_blank" rel="noreferrer">B20 source ↗</a></div><div className="stock-map"><span>YOU ARE HERE</span><canvas ref={map} width={180} height={126} aria-label="Map of stock positions and current viewport" /></div></footer>
-    {indexOpen && <aside className="stock-index" aria-label="Stock index" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
+    {indexOpen && <aside className="stock-index" aria-label="Stock directory" onKeyDown={e => { if(e.key === "Escape") { setIndexOpen(false); indexButton.current?.focus(); } }}>
       <header><span>{exhibits.length} assets</span><button onClick={() => {setIndexOpen(false); indexButton.current?.focus();}}>Close</button></header>
       <input ref={indexInput} aria-label="Search stocks" placeholder="Company or ticker" value={query} onChange={e => setQuery(e.target.value)} />
       {!exhibits.some(a => `${a.name} ${a.symbol} ${a.address}`.toLowerCase().includes(query.toLowerCase().trim())) && <p role="status">No matching stocks. Try a company name or ticker.</p>}

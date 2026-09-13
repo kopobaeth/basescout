@@ -290,7 +290,7 @@ html[data-theme="light"] .stocks-detail-grid .stocks-button-primary:hover {
 
 .stock-object-caption strong {
   font-family: var(--brand-sans);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -298,7 +298,7 @@ html[data-theme="light"] .stocks-detail-grid .stocks-button-primary:hover {
 .stock-object-number,
 .stock-object-caption small {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .stock-universe .stock-object-open {
