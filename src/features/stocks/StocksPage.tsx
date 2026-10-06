@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import {
   STOCKS,
+  STOCK_API_SOURCE,
   STOCK_SOURCE,
   CATALOG_CHECKED,
   findStock,
@@ -47,6 +48,16 @@ const money = (n?: number) =>
         currency: "USD",
         maximumFractionDigits: n < 1 ? 6 : 2,
       }).format(n);
+const quantity = (n?: number) =>
+  n === undefined
+    ? "Unavailable"
+    : new Intl.NumberFormat("en-US", {
+        notation: n >= 1_000_000 ? "compact" : "standard",
+        maximumFractionDigits: 2,
+      }).format(n);
+const percent = (n?: number) =>
+  n === undefined ? "Unavailable" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
+const PAUSE_LABELS = ["Transfers", "Minting", "Burning", "Seizing"] as const;
 
 const STOCK_LOGOS: Record<
   string,
@@ -183,6 +194,8 @@ export function StocksPage() {
           data.address !== selected.address ||
           !data.market ||
           !data.chain ||
+          !data.reference ||
+          !data.comparison ||
           !Number.isFinite(data.fetchedAt)
         )
           throw new Error();
@@ -235,6 +248,12 @@ export function StocksPage() {
         .includes(query.trim().toLowerCase()),
   );
   const stale = snapshot && now - snapshot.fetchedAt > 120000;
+  const navTimestamp = snapshot?.reference.navPriceUpdatedAt
+    ? Date.parse(snapshot.reference.navPriceUpdatedAt)
+    : undefined;
+  const navHeld =
+    navTimestamp !== undefined && now - navTimestamp > 25 * 60 * 60 * 1000;
+  const transferPaused = snapshot?.reference.pausedFeatures.includes(0);
   if (!selected && !invalidRoute) return <StocksCanvas theme={theme} onThemeChange={setTheme} />;
   if (!embedded) return null;
   return (
@@ -357,6 +376,12 @@ export function StocksPage() {
                     <dt>Catalog checked</dt>
                     <dd>{CATALOG_CHECKED}</dd>
                   </div>
+                  {snapshot?.reference.isin && (
+                    <div>
+                      <dt>ISIN</dt>
+                      <dd>{snapshot.reference.isin}</dd>
+                    </div>
+                  )}
                 </dl>
                 <p>
                   List membership confirms the address mapping, not investment
@@ -380,11 +405,42 @@ export function StocksPage() {
                   <p role="alert">{error}</p>
                 ) : snapshot ? (
                   <>
-                    <p className="stocks-price">
-                      {money(snapshot.market.price)}
-                    </p>
-                    <p>DEX market price per token</p>
+                    <div className="stocks-price-grid">
+                      <div>
+                        <span>DEX market price</span>
+                        <strong>{money(snapshot.market.price)}</strong>
+                      </div>
+                      <div>
+                        <span>Chainlink NAV reference</span>
+                        <strong>{money(snapshot.reference.navPrice)}</strong>
+                      </div>
+                    </div>
                     <dl>
+                      <div>
+                        <dt>DEX vs NAV</dt>
+                        <dd
+                          className={
+                            snapshot.comparison.dexToNavPercent !== undefined &&
+                            Math.abs(snapshot.comparison.dexToNavPercent) >= 3
+                              ? "stocks-value-warning"
+                              : ""
+                          }
+                        >
+                          {percent(snapshot.comparison.dexToNavPercent)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>NAV publication</dt>
+                        <dd className={navHeld ? "stocks-value-warning" : ""}>
+                          {snapshot.reference.navPriceUpdatedAt
+                            ? `${navHeld ? "Held" : "Recent"} · ${new Date(snapshot.reference.navPriceUpdatedAt).toLocaleString()}`
+                            : "Unavailable"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Normalized supply</dt>
+                        <dd>{quantity(snapshot.reference.totalSupply)}</dd>
+                      </div>
                       <div>
                         <dt>Selected pool liquidity</dt>
                         <dd>{money(snapshot.market.liquidity)}</dd>
@@ -406,12 +462,51 @@ export function StocksPage() {
                         </dd>
                       </div>
                     </dl>
+                    <div
+                      className={`stocks-reference-status${
+                        transferPaused ? " stocks-reference-critical" : ""
+                      }`}
+                    >
+                      {snapshot.reference.status === "available" ? (
+                        <>
+                          <strong>
+                            {snapshot.reference.pausedFeatures.length
+                              ? `Paused: ${snapshot.reference.pausedFeatures
+                                  .map((feature) => PAUSE_LABELS[feature] ?? `Feature ${feature}`)
+                                  .join(", ")}`
+                              : "No B20 features reported paused"}
+                          </strong>
+                          <span>
+                            {transferPaused
+                              ? "Transfers are currently reported as paused."
+                              : "Pause state supplied by the official Tokenized Stocks API."}
+                          </span>
+                        </>
+                      ) : snapshot.reference.status === "not-listed" ? (
+                        <>
+                          <strong>Not returned by the official API</strong>
+                          <span>
+                            The address remains in BaseScout's reviewed catalog, but Coinbase does not currently expose a matching record.
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <strong>Official reference unavailable</strong>
+                          <span>NAV, supply, and pause state could not be verified in this request.</span>
+                        </>
+                      )}
+                    </div>
                     <p>
                       {snapshot.market.status === "no-data"
                         ? "No matching base-side pool returned by DEX Screener. This does not establish that the asset cannot be traded."
                         : snapshot.market.status === "unavailable"
                           ? "Market provider unavailable. Missing data is not a zero price or zero liquidity."
                           : "Data by DEX Screener · highest-liquidity matching base-side pool. Retrieval time is not the time of the last trade."}
+                    </p>
+                    <p>
+                      NAV is a Chainlink-based reference value, not a live bid,
+                      ask, or executable price. It can remain unchanged outside
+                      market hours or during a corporate action.
                     </p>
                     <p>
                       {snapshot.chain.status === "available"
@@ -443,8 +538,9 @@ export function StocksPage() {
                   <h3>Issuer controls remain relevant</h3>
                   <p>
                     Policies, pause controls, and administrative powers can
-                    affect transfers. This report does not check your wallet
-                    eligibility, current transfer policies, or pause state.
+                    affect transfers. BaseScout now displays the pause state
+                    reported by the official API, but does not determine wallet
+                    eligibility or evaluate every transfer policy.
                   </p>
                 </article>
                 <article>
@@ -535,6 +631,9 @@ export function StocksPage() {
           <div>
             <a href={STOCK_SOURCE} target="_blank" rel="noreferrer">
               Official B20 sources <ArrowUpRight size={13} />
+            </a>
+            <a href={STOCK_API_SOURCE} target="_blank" rel="noreferrer">
+              Coinbase reference API <ArrowUpRight size={13} />
             </a>
             <a
               href="https://www.coinbase.com/tokenize"

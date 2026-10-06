@@ -7,9 +7,13 @@ https://docs.base.org/specifications/b20/tokenized-stocks-on-base
 
 `GET /api/stocks?address=...` accepts only catalog entries. DEX Screener supplies the highest-liquidity matching Base pool with the requested asset on the base side. Its `priceUsd` is never reused for a quote-side match. Market price is per token and is not multiplied again. Liquidity and volume refer to one selected pool, not total asset liquidity or BaseScout processed volume.
 
+The same request matches the address against Coinbase's public read-only Tokenized Stocks API. It returns the current Chainlink-based NAV/reference value and publication time, normalized total supply, multiplier, ISIN, and paused feature ordinals. BaseScout calculates DEX premium/discount only when both the DEX price and NAV are valid positive values. NAV is not a bid, ask, or execution quote; a held value can be expected outside equity market hours and during corporate actions. A missing official record and a provider outage are shown as different states.
+
 The B20 `multiplier()` read is pinned to a Base block, uses 18-decimal fixed-point formatting, and never defaults to 1. Configure server-only `BASE_RPC_URL` for a production RPC; otherwise it uses the public Base endpoint. Provider calls have timeouts and partial failure handling. Results cache for 30 seconds, with no HTTP caching; the UI warns after 2 minutes. Retrieval time does not imply recent trade activity.
 
-This release is read-only: no trading links, swaps, wallet eligibility verdict, transfer simulation, pause/policy monitoring, or oracle premium calculation. It does not claim the asset is safe. Issuer restrictions remain relevant. Known stock addresses entered into the scanner route to Stocks; the report API returns HTTP 422 `unsupported_asset` rather than an ERC-20 risk score.
+This release is read-only: no swaps, wallet eligibility verdict, transfer simulation, or complete policy evaluation. It does not claim the asset is safe. It displays the API-reported paused features and the DEX/NAV difference, but neither is an execution guarantee. Issuer restrictions remain relevant. Known stock addresses entered into the scanner route to Stocks; the report API returns HTTP 422 `unsupported_asset` rather than an ERC-20 risk score.
+
+Production should set a server-only `BASE_RPC_URL` from a dedicated Base RPC provider. The public `mainnet.base.org` endpoint remains a best-effort development fallback with lower rate limits; no client bundle receives the configured URL.
 
 Saved stocks use a separate browser-local list. Stock analytics reuse existing opt-out handling. No wallet data is collected.
 

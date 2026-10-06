@@ -3,6 +3,7 @@ import { createPublicClient, formatUnits, http, parseAbi } from "viem";
 import { base } from "viem/chains";
 import {
   findStock,
+  STOCK_API_SOURCE,
   type Stock,
   type StockSnapshot,
 } from "../src/features/stocks/catalog.js";
@@ -19,6 +20,59 @@ function number(value: unknown): number | undefined {
     return undefined;
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+function text(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+export function normalizeOfficialStock(
+  value: unknown,
+  address: string,
+): StockSnapshot["reference"] {
+  const tokens = record(value).tokens;
+  if (!Array.isArray(tokens)) throw new Error("Invalid stock reference response");
+  const token = tokens
+    .map(record)
+    .find(
+      (candidate) =>
+        text(candidate.contract_address)?.toLowerCase() === address.toLowerCase(),
+    );
+  if (!token) return { status: "not-listed", pausedFeatures: [] };
+  const pausedFeatures = Array.isArray(token.paused_features)
+    ? token.paused_features
+        .map(number)
+        .filter((feature): feature is number => feature !== undefined)
+        .filter((feature) => Number.isInteger(feature) && feature >= 0 && feature <= 3)
+    : [];
+  const navPriceUpdatedAt = text(token.nav_price_updated_at);
+  return {
+    status: "available",
+    navPrice: number(token.nav_price),
+    navPriceUpdatedAt:
+      navPriceUpdatedAt && Number.isFinite(Date.parse(navPriceUpdatedAt))
+        ? navPriceUpdatedAt
+        : undefined,
+    totalSupply: number(token.total_supply),
+    multiplier: number(token.multiplier),
+    isin: text(token.isin),
+    pausedFeatures: [...new Set(pausedFeatures)].sort((a, b) => a - b),
+  };
+}
+
+export function calculateDexToNavPercent(
+  dexPrice?: number,
+  navPrice?: number,
+): number | undefined {
+  if (
+    dexPrice === undefined ||
+    navPrice === undefined ||
+    !Number.isFinite(dexPrice) ||
+    !Number.isFinite(navPrice) ||
+    dexPrice < 0 ||
+    navPrice <= 0
+  )
+    return undefined;
+  return ((dexPrice - navPrice) / navPrice) * 100;
 }
 export function normalizeStockMarket(
   value: unknown,
@@ -66,7 +120,7 @@ export async function getStockSnapshot(stock: Stock): Promise<StockSnapshot> {
       retryCount: 0,
     }),
   });
-  const [marketResult, chainResult] = await Promise.allSettled([
+  const [marketResult, chainResult, referenceResult] = await Promise.allSettled([
     (async () => {
       const response = await fetch(
         `https://api.dexscreener.com/latest/dex/tokens/${stock.address}`,
@@ -90,18 +144,38 @@ export async function getStockSnapshot(stock: Stock): Promise<StockSnapshot> {
         block: block.toString(),
       };
     })(),
+    (async () => {
+      const response = await fetch(STOCK_API_SOURCE, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) throw new Error("Stock reference provider unavailable");
+      return normalizeOfficialStock(await response.json(), stock.address);
+    })(),
   ]);
+  const market: StockSnapshot["market"] =
+    marketResult.status === "fulfilled"
+      ? marketResult.value
+      : { status: "unavailable" };
+  const reference: StockSnapshot["reference"] =
+    referenceResult.status === "fulfilled"
+      ? referenceResult.value
+      : { status: "unavailable", pausedFeatures: [] };
   const snapshot: StockSnapshot = {
     address: stock.address,
     fetchedAt: Date.now(),
-    market:
-      marketResult.status === "fulfilled"
-        ? marketResult.value
-        : { status: "unavailable" },
+    market,
     chain:
       chainResult.status === "fulfilled"
         ? chainResult.value
         : { status: "unavailable" },
+    reference,
+    comparison: {
+      dexToNavPercent: calculateDexToNavPercent(
+        market.price,
+        reference.navPrice,
+      ),
+    },
   };
   cache.set(stock.address, snapshot);
   return snapshot;

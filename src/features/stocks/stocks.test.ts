@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { STOCKS, findStock } from "./catalog";
-import { normalizeStockMarket, getStockSnapshot } from "../../../api/stocks";
+import {
+  calculateDexToNavPercent,
+  getStockSnapshot,
+  normalizeOfficialStock,
+  normalizeStockMarket,
+} from "../../../api/stocks";
 assert.equal(new Set(STOCKS.map((s) => s.address)).size, 13);
 for (const s of STOCKS) {
   assert.match(s.address, /^0x[0-9a-f]{40}$/);
@@ -47,6 +52,34 @@ assert.equal(
   ).price,
   undefined,
 );
+const official = normalizeOfficialStock(
+  {
+    tokens: [
+      {
+        contract_address: address.toUpperCase(),
+        total_supply: "1000.5",
+        multiplier: 1.02,
+        isin: "US0000000001",
+        paused_features: [2, 0, 2, 9, "1"],
+        nav_price: "100",
+        nav_price_updated_at: "2026-10-06T12:00:00Z",
+      },
+    ],
+  },
+  address,
+);
+assert.equal(official.status, "available");
+assert.equal(official.totalSupply, 1000.5);
+assert.equal(official.navPrice, 100);
+assert.deepEqual(official.pausedFeatures, [0, 1, 2]);
+assert.equal(calculateDexToNavPercent(105, 100), 5);
+assert.equal(calculateDexToNavPercent(95, 100), -5);
+assert.equal(calculateDexToNavPercent(100, 0), undefined);
+assert.equal(
+  normalizeOfficialStock({ tokens: [] }, address).status,
+  "not-listed",
+);
+assert.throws(() => normalizeOfficialStock({}, address));
 // Provider failures must be explicit, not fabricated zeros or a 1:1 multiplier.
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => {
@@ -58,6 +91,8 @@ try {
   assert.equal(result.chain.status, "unavailable");
   assert.equal(result.market.price, undefined);
   assert.equal(result.chain.multiplier, undefined);
+  assert.equal(result.reference.status, "unavailable");
+  assert.equal(result.comparison.dexToNavPercent, undefined);
 } finally {
   globalThis.fetch = originalFetch;
 }

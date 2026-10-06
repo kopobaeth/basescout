@@ -1,5 +1,7 @@
 export const STOCK_SOURCE =
   "https://docs.base.org/specifications/b20/tokenized-stocks-on-base";
+export const STOCK_API_SOURCE =
+  "https://api.coinbase.com/v1/tokenized-stocks";
 export const CATALOG_CHECKED = "2026-09-09";
 export const STOCKS = [
   ["AAPLc", "Apple", "0xb200000000000000000000C2e324d24d7eEcd1fb"],
@@ -42,5 +44,17 @@ export type StockSnapshot = {
     status: "available" | "unavailable";
     multiplier?: string;
     block?: string;
+  };
+  reference: {
+    status: "available" | "not-listed" | "unavailable";
+    navPrice?: number;
+    navPriceUpdatedAt?: string;
+    totalSupply?: number;
+    multiplier?: number;
+    isin?: string;
+    pausedFeatures: number[];
+  };
+  comparison: {
+    dexToNavPercent?: number;
   };
 };
